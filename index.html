@@ -605,13 +605,16 @@ window.addEventListener('firebase-ready', () => {
   initApp();
 });
 
-async function fbSet(path, data) {
-  const ref = fs.doc(db, ...path.split('/'));
+async function fbSet(col, id, data) {
+  // Support both fbSet('teams/id', data) and fbSet('teams', 'id', data)
+  if (data === undefined) { data = id; const parts = col.split('/'); col = parts[0]; id = parts[1]; }
+  const ref = fs.doc(db, col, id);
   await fs.setDoc(ref, data, { merge: true });
 }
 
-async function fbGet(path) {
-  const ref = fs.doc(db, ...path.split('/'));
+async function fbGet(col, id) {
+  if (id === undefined) { const parts = col.split('/'); col = parts[0]; id = parts[1]; }
+  const ref = fs.doc(db, col, id);
   const snap = await fs.getDoc(ref);
   return snap.exists() ? snap.data() : null;
 }
@@ -639,25 +642,40 @@ async function uploadPhoto(file, path) {
 async function initApp() {
   document.getElementById('totalRoutes').textContent = ROUTES.length;
 
+  // Test Firebase connection
+  try {
+    await fbSet('_test/ping', { t: Date.now() });
+    console.log('✅ Firebase connected');
+    document.querySelector('#splash p').textContent = 'Firebase connected ✅';
+  } catch(e) {
+    console.error('❌ Firebase error:', e);
+    document.querySelector('#splash p').textContent = '⚠️ Firebase error — check Firestore rules';
+    showToast('Firebase error: Open console for details. Check Firestore rules.', 'error');
+    // Still continue — app works in local mode
+  }
+
   // Listen for team count
-  fbListen('teams', teams => {
-    document.getElementById('totalTeams').textContent = teams.length;
-    if (state.isAdmin) renderAdmin(teams);
-    renderLeaderboard(teams);
-  });
+  try {
+    fbListen('teams', teams => {
+      document.getElementById('totalTeams').textContent = teams.length;
+      if (state.isAdmin) renderAdmin(teams);
+      renderLeaderboard(teams);
+    });
+  } catch(e) { console.error('Listen failed:', e); }
 
   // Restore session
   const saved = localStorage.getItem('srmHuntTeam');
   if (saved) {
     const teamData = JSON.parse(saved);
     state.team = teamData;
-    // Refresh from Firebase
-    const fresh = await fbGet(`teams/${teamData.id}`);
-    if (fresh) {
-      state.team = { id: teamData.id, ...fresh };
-      localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
-      resumeSession();
-    }
+    try {
+      const fresh = await fbGet(`teams/${teamData.id}`);
+      if (fresh) {
+        state.team = { id: teamData.id, ...fresh };
+        localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+      }
+    } catch(e) { console.warn('Could not refresh team from Firebase'); }
+    resumeSession();
   }
 
   hideSplash();
@@ -799,13 +817,30 @@ async function submitRegistration() {
   try {
     const teamId = 'team_' + Date.now();
     
-    // Upload photo
-    let photoUrl = '';
+    // Convert photo to base64 — store directly in Firestore, no Storage needed
+    let photoBase64 = '';
     try {
-      photoUrl = await uploadPhoto(state.regPhoto, `teams/${teamId}/team_photo.jpg`);
+      photoBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          // Compress: resize to max 400px wide
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxW = 400;
+            const scale = Math.min(1, maxW / img.width);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(state.regPhoto);
+      });
     } catch(e) {
-      // Storage might not be set up — continue without photo
-      console.warn('Photo upload failed:', e);
+      console.warn('Photo compress failed:', e);
     }
 
     // Pick route with cooldown
@@ -817,7 +852,7 @@ async function submitRegistration() {
       leaderName,
       members,
       memberCount: members.length,
-      photoUrl,
+      photoUrl: photoBase64,
       route: route.id,
       routeCheckpoints: route.cps,
       status: 'pending',
@@ -836,12 +871,12 @@ async function submitRegistration() {
     state.team = teamData;
     localStorage.setItem('srmHuntTeam', JSON.stringify(teamData));
 
-    showToast('Registration submitted! Waiting for admin approval.', 'success');
+    showToast('Registered! Waiting for admin approval.', 'success');
     showWaiting(teamData);
 
   } catch (err) {
-    console.error(err);
-    showToast('Error: ' + err.message, 'error');
+    console.error('Registration error:', err);
+    showToast('Error: ' + (err.message || 'Check Firestore rules'), 'error');
     btn.textContent = 'Submit Registration 🚀';
     btn.disabled = false;
   }
@@ -1168,15 +1203,32 @@ async function submitVerify() {
     return;
   }
   
-  // Upload verify photo
+  // Upload verify photo as base64
   try {
-    const url = await uploadPhoto(state.verifyPhoto, `teams/${state.team.id}/cp${state.team.currentCheckpoint+1}.jpg`);
+    const b64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 400;
+          const scale = Math.min(1, maxW / img.width);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(state.verifyPhoto);
+    });
     const completed = [...(state.team.checkpointsCompleted || []), locId];
     await fbSet(`teams/${state.team.id}`, {
       checkpointsCompleted: completed,
-      [`cpPhoto${state.team.currentCheckpoint}`]: url
+      [`cpPhoto${state.team.currentCheckpoint}`]: b64
     });
-  } catch(e) { console.warn('Photo upload failed', e); }
+  } catch(e) { console.warn('Photo save failed', e); }
   
   // Checkpoint passed!
   resultIcon.textContent = '✅';
