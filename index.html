@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>SRM Treasure Hunt</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query, orderBy, serverTimestamp, arrayUnion } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDaDGTyfcd65OxyNTYrwZNIx1k6RH4C3n8",
+  authDomain: "srm-treasure-hunt.firebaseapp.com",
+  projectId: "srm-treasure-hunt",
+  storageBucket: "srm-treasure-hunt.firebasestorage.app",
+  messagingSenderId: "624533605973",
+  appId: "1:624533605973:web:93057e7f9b10a173d5cedc"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+window.DB = db;
+window.STORAGE = storage;
+window.FB = { collection, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query, orderBy, serverTimestamp, arrayUnion, ref, uploadBytes, getDownloadURL };
+window.firebaseReady = true;
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<!-- face-api.js for people counting -->
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+
+<style>
+:root{
+  --bg:#08080E;--surface:#111118;--surface2:#1A1A24;--surface3:#22222F;
+  --border:#2C2C3E;--border2:#3A3A50;
+  --text:#F0EFF8;--muted:#8080A0;--dim:#505068;
+  --gold:#F5C842;--gold2:#D4A520;--gold-bg:rgba(245,200,66,.1);--gold-border:rgba(245,200,66,.25);
+  --green:#22C55E;--green-bg:rgba(34,197,94,.1);--green-border:rgba(34,197,94,.25);
+  --red:#EF4444;--red-bg:rgba(239,68,68,.1);--red-border:rgba(239,68,68,.25);
+  --amber:#F59E0B;--amber-bg:rgba(245,158,11,.1);--amber-border:rgba(245,158,11,.25);
+  --blue:#3B82F6;--blue-bg:rgba(59,130,246,.1);--blue-border:rgba(59,130,246,.25);
+  --r:12px;--r-lg:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{height:100%;font-size:16px}
+body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden;line-height:1.5}
+h1,h2,h3,h4{font-family:'Syne',sans-serif;font-weight:700;line-height:1.2}
+
+/* ── SCREENS ── */
+.screen{display:none;min-height:100vh;flex-direction:column;animation:fadeIn .2s ease}
+.screen.active{display:flex}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.page{max-width:480px;margin:0 auto;width:100%;padding:0 16px;flex:1;display:flex;flex-direction:column}
+.scroll{overflow-y:auto;flex:1;padding-bottom:32px}
+.scroll::-webkit-scrollbar{width:3px}
+.scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--surface);max-width:480px;margin:0 auto;width:100%;flex-shrink:0;position:sticky;top:0;z-index:100}
+.topbar-title{font-family:'Syne',sans-serif;font-size:15px;font-weight:700}
+.back-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:20px;line-height:1;transition:background .15s;flex-shrink:0}
+.back-btn:hover{background:var(--surface2)}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:.4px;font-family:'Syne',sans-serif;white-space:nowrap}
+.b-gold{background:var(--gold-bg);color:var(--gold);border:1px solid var(--gold-border)}
+.b-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.b-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.b-amber{background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber-border)}
+.b-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border)}
+.b-dim{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+
+/* ── CARDS ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.card-lbl{font-size:10px;font-weight:700;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;font-family:'Syne',sans-serif}
+
+/* ── INPUTS ── */
+input,select,textarea{width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s;margin-bottom:10px}
+input:focus,select:focus,textarea:focus{border-color:var(--gold)}
+input::placeholder,textarea::placeholder{color:var(--muted)}
+select option{background:var(--surface)}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;font-weight:500}
+
+/* ── BUTTONS ── */
+.btn{width:100%;padding:13px 16px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text);transition:all .15s;font-family:'Syne',sans-serif;letter-spacing:.2px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover:not(:disabled){background:var(--surface3);border-color:var(--border2)}
+.btn:active:not(:disabled){transform:scale(.98)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn-gold{background:var(--gold);color:#08080E;border-color:var(--gold)}
+.btn-gold:hover:not(:disabled){background:var(--gold2);border-color:var(--gold2)}
+.btn-green{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-red{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-sm{width:auto;padding:8px 14px;font-size:13px}
+.btn-icon{width:36px;height:36px;padding:0;border-radius:8px;flex-shrink:0}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+
+/* ── METRIC CARDS ── */
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;text-align:center}
+.metric-val{font-size:22px;font-weight:800;font-family:'Syne',sans-serif}
+.metric-lbl{font-size:11px;color:var(--muted);margin-top:3px;font-weight:500}
+
+/* ── PROGRESS ── */
+.prog{height:5px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;background:var(--gold);border-radius:3px;transition:width .5s ease}
+
+/* ── HERO ── */
+.hero{text-align:center;padding:40px 16px 28px;display:flex;flex-direction:column;align-items:center}
+.hero-icon{font-size:60px;margin-bottom:18px;animation:float 3s ease-in-out infinite;line-height:1}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.hero-title{font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;background:linear-gradient(135deg,#F5C842,#E8A020);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:14px;color:var(--muted);margin-bottom:32px;line-height:1.6}
+
+/* ── CLUE CARD ── */
+.clue-wrap{background:var(--gold-bg);border:1px solid var(--gold-border);border-radius:14px;padding:20px;margin-bottom:14px}
+.clue-lbl{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;font-family:'Syne',sans-serif}
+.clue-text{font-size:15px;line-height:1.7;color:var(--text)}
+
+/* ── HOT COLD BAR ── */
+.temp-wrap{margin-bottom:14px}
+.temp-bar-outer{position:relative;height:28px;border-radius:14px;overflow:visible;margin:14px 0 8px}
+.temp-bar-fill{position:absolute;inset:0;border-radius:14px;background:linear-gradient(to right,#3B82F6,#22C55E,#F59E0B,#EF4444)}
+.temp-needle{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:34px;background:var(--text);border-radius:4px;box-shadow:0 0 0 3px var(--bg);transition:left .7s cubic-bezier(.34,1.56,.64,1);z-index:2}
+.temp-lbl-wrap{text-align:center}
+.temp-lbl{font-size:24px;font-weight:800;font-family:'Syne',sans-serif;transition:color .5s}
+.temp-sub{font-size:13px;color:var(--muted);margin-top:4px;min-height:20px}
+
+/* ── PROXIMITY POPUP ── */
+.prox-overlay{position:fixed;inset:0;background:rgba(8,8,14,.92);z-index:200;display:flex;align-items:flex-end;justify-content:center;animation:slideUp .3s ease}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.prox-sheet{background:var(--surface);border:1px solid var(--border);border-radius:20px 20px 0 0;padding:24px 20px 32px;width:100%;max-width:480px}
+.prox-title{font-size:18px;font-weight:700;font-family:'Syne',sans-serif;text-align:center;margin-bottom:6px}
+.prox-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:20px}
+
+/* ── CAMERA ZONE ── */
+.cam-wrap{width:100%;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:#000;position:relative;margin-bottom:14px}
+.cam-wrap video{width:100%;height:100%;object-fit:cover}
+.cam-wrap canvas{width:100%;height:100%;object-fit:cover}
+.cam-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:rgba(0,0,0,.5)}
+.cam-status{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;white-space:nowrap}
+
+/* ── VERIFY CHECKS ── */
+.chk-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.chk-row:last-child{border:none}
+.chk-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;transition:all .3s}
+.ci-p{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.ci-f{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.ci-w{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.ci-c{background:var(--amber-bg);color:var(--amber);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── LEADERBOARD ── */
+.lb-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border)}
+.lb-row.r1{background:rgba(245,200,66,.07);border-color:rgba(245,200,66,.35)}
+.lb-row.r2{background:rgba(192,192,192,.05);border-color:rgba(192,192,192,.25)}
+.lb-row.r3{background:rgba(205,127,50,.05);border-color:rgba(205,127,50,.25)}
+.rank-c{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;font-family:'Syne',sans-serif}
+.rc1{background:rgba(245,200,66,.2);color:var(--gold)}
+.rc2{background:rgba(192,192,192,.15);color:#C0C0C0}
+.rc3{background:rgba(205,127,50,.15);color:#CD7F32}
+.rcn{background:var(--surface2);color:var(--muted)}
+
+/* ── ADMIN ── */
+.adm-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;margin-bottom:8px;background:var(--surface2);border:1px solid var(--border)}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-g{background:var(--green);box-shadow:0 0 6px var(--green)}
+.dot-a{background:var(--amber)}
+.dot-r{background:var(--red)}
+.dot-m{background:var(--dim)}
+
+/* ── MEMBER CHIP ── */
+.member-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:10px;margin-bottom:8px;border:1px solid var(--border)}
+.av{width:36px;height:36px;border-radius:50%;background:var(--gold-bg);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;border:1px solid var(--gold-border);font-family:'Syne',sans-serif}
+
+/* ── MISC ── */
+.divider{height:1px;background:var(--border);margin:14px 0}
+.alert-box{border-radius:10px;padding:14px;margin-bottom:12px}
+.alert-gold{background:var(--gold-bg);border:1px solid var(--gold-border)}
+.alert-red{background:var(--red-bg);border:1px solid var(--red-border)}
+.alert-green{background:var(--green-bg);border:1px solid var(--green-border)}
+.alert-amber{background:var(--amber-bg);border:1px solid var(--amber-border)}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:13px;font-weight:500;z-index:999;transition:transform .3s,opacity .3s;opacity:0;pointer-events:none;white-space:nowrap;max-width:340px;text-align:center}
+#toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* ── LOADER ── */
+#loader{position:fixed;inset:0;background:var(--bg);z-index:500;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity .4s}
+#loader.hide{opacity:0;pointer-events:none}
+.spin-ring{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+
+/* ── WAITING SCREEN ── */
+.wait-orb{width:110px;height:110px;border-radius:50%;border:2px solid var(--gold-border);display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:44px;animation:pulse-border 2s ease-in-out infinite}
+@keyframes pulse-border{0%,100%{box-shadow:0 0 0 0 rgba(245,200,66,.2)}50%{box-shadow:0 0 0 12px rgba(245,200,66,.05)}}
+
+/* ── COMPLETE ── */
+.trophy-big{font-size:80px;animation:bounce .5s ease infinite alternate;display:block;text-align:center}
+@keyframes bounce{to{transform:scale(1.08) translateY(-6px)}}
+
+/* ── STATUS CARD FOR TEAM ── */
+.team-photo-preview{width:100%;aspect-ratio:16/9;border-radius:10px;object-fit:cover;background:var(--surface2);display:block}
+.pending-badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--amber);padding:8px 14px;background:var(--amber-bg);border-radius:8px;border:1px solid var(--amber-border)}
+
+@media(max-width:380px){.hero-title{font-size:28px}.timer-big{font-size:34px}}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div style="font-size:42px;margin-bottom:4px">🏴‍☠️</div>
+  <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--gold)">SRM Treasure Hunt</div>
+  <div class="spin-ring" style="margin-top:12px"></div>
+  <div id="loader-msg" style="font-size:13px;color:var(--muted);margin-top:8px">Connecting...</div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- LANDING -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-landing" class="screen">
+<div class="page">
+  <div class="hero">
+    <div class="hero-icon">🏴‍☠️</div>
+    <h1 class="hero-title">SRM Treasure Hunt</h1>
+    <p class="hero-sub">Race across campus.<br>Find the locations. Beat the clock.</p>
+    <button class="btn btn-gold" style="margin-bottom:10px;max-width:320px;width:100%" onclick="goto('s-register')">Register Your Team</button>
+    <button class="btn" style="margin-bottom:10px;max-width:320px;width:100%" onclick="continueHunt()">Continue Hunt</button>
+    <button class="btn btn-sm" style="opacity:.55;margin-top:8px" onclick="goto('s-admin-login')">Admin Access</button>
+  </div>
+  <div class="metrics" style="margin-bottom:24px">
+    <div class="metric"><div class="metric-val" id="stat-routes">40</div><div class="metric-lbl">Routes</div></div>
+    <div class="metric"><div class="metric-val" id="stat-locs">48</div><div class="metric-lbl">Locations</div></div>
+    <div class="metric"><div class="metric-val" id="stat-teams">—</div><div class="metric-lbl">Teams</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- REGISTER: STEP 1 — TEAM INFO + MEMBERS -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-register" class="screen">
+<div class="topbar"><button class="back-btn" onclick="goto('s-landing')">←</button><span class="topbar-title">Team Registration</span><span class="badge b-gold">1 / 2</span></div>
+<div class="page"><div class="scroll" style="padding-top:16px">
+  <div class="card">
+    <div class="card-lbl">Team info</div>
+    <label>Team name *</label>
+    <input id="r-team" placeholder="e.g. Code Crushers" maxlength="30">
+    <label>Team leader full name *</label>
+    <input id="r-leader" placeholder="Leader's full name" maxlength="50">
+  </div>
+  <div class="card">
+    <div class="card-lbl">Team members</div>
+    <div id="members-list"></div>
+    <div id="add-form" style="display:none;background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid var(--border)">
+      <label>Full name *</label><input id="m-name" placeholder="Student full name">
+      <label>Reg. number *</label><input id="m-reg" placeholder="e.g. RA2211028010001">
+      <label>Phone</label><input id="m-phone" placeholder="+91 XXXXXXXXXX" type="tel">
+      <label>SRM email</label><input id="m-email" placeholder="name@srmist.edu.in" type="email">
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-gold" onclick="addMember()">Add</button>
+        <button class="btn btn-sm" onclick="toggleAddForm()">Cancel</button>
+      </div>
+    </div>
+    <button class="btn" id="add-btn" onclick="toggleAddForm()">+ Add member</button>
+  </div>
+  <button class="btn btn-gold" id="reg-next" onclick="goToPhotoStep()" disabled>Next — Team Photo →</button>
+</div></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- REGISTER: STEP 2 — TEAM PHOTO + FACE COUNT -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-photo" class="screen">
+<div class="topbar"><button class="back-btn" onclick="goto('s-register')">←</button><span class="topbar-title">Team Photo</span><span class="badge b-gold">2 / 2</span></div>
+<div class="page"><div class="scroll" style="padding-top:16px">
+  <div class="alert-box alert-amber" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">📸 Important</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.6">Take a group selfie with ALL team members visible. The AI will count faces and use this to verify your team at every checkpoint.</div>
+  </div>
+  <div class="card">
+    <div class="card-lbl">Team selfie</div>
+    <div class="cam-wrap" id="photo-cam-wrap">
+      <div class="cam-overlay" id="photo-cam-overlay">
+        <div style="font-size:36px">📷</div>
+        <div style="font-size:14px;font-weight:600;font-family:'Syne',sans-serif">Tap to open camera</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6)">All members must be visible</div>
+      </div>
+      <video id="photo-video" style="display:none;width:100%;height:100%;object-fit:cover" playsinline></video>
+      <canvas id="photo-canvas" style="display:none;width:100%;height:100%;object-fit:cover"></canvas>
+    </div>
+    <div id="photo-btn-area">
+      <button class="btn" id="open-cam-btn" onclick="openTeamCamera()">📷 Open Camera</button>
+    </div>
+    <div id="face-result" style="display:none" class="alert-box alert-green" style="margin-top:10px">
+      <div style="font-size:14px;font-weight:700;color:var(--green)" id="face-result-text"></div>
+    </div>
+    <div id="face-error" style="display:none" class="alert-box alert-red" style="margin-top:10px">
+      <div style="font-size:13px;color:var(--red)" id="face-error-text"></div>
+    </div>
+  </div>
+  <button class="btn btn-gold" id="photo-submit" onclick="submitRegistration()" disabled>Submit Registration →</button>
+</div></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- WAITING FOR APPROVAL -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-waiting" class="screen">
+<div class="page" style="justify-content:center;align-items:center;text-align:center;padding:40px 16px">
+  <div class="wait-orb" id="wait-orb">⏳</div>
+  <h2 style="font-size:22px;margin-bottom:10px" id="wait-title">Waiting for approval</h2>
+  <p style="font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6" id="wait-sub">Your registration is being reviewed by the admin.<br>Stand by at TP1.</p>
+  <div class="card" style="width:100%;max-width:320px;text-align:left">
+    <div class="card-lbl">Your team</div>
+    <div style="font-size:20px;font-weight:700;font-family:'Syne',sans-serif" id="wait-team-name">—</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:4px" id="wait-route">—</div>
+    <div style="margin-top:10px" id="wait-members-chips"></div>
+  </div>
+  <div id="wait-approved-card" style="display:none;width:100%;max-width:320px;margin-top:12px" class="alert-box alert-green">
+    <div style="font-size:15px;font-weight:700;color:var(--green);margin-bottom:4px">✅ Approved! Hunt is live.</div>
+    <div style="font-size:13px;color:var(--muted)">Admin has started the hunt. Get moving!</div>
+  </div>
+  <button class="btn btn-gold" id="start-hunt-btn" style="margin-top:20px;max-width:320px;width:100%;display:none" onclick="startHunt()">Start Hunt! 🏃</button>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- HUNT SCREEN -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-hunt" class="screen">
+<div class="topbar">
+  <div style="flex:1;min-width:0">
+    <div style="font-size:13px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="h-team-name">Team</div>
+    <div style="font-size:11px;color:var(--muted)" id="h-route-lbl">Route</div>
+  </div>
+  <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:var(--gold);font-variant-numeric:tabular-nums;margin:0 12px" id="h-timer">00:00</div>
+  <button class="back-btn btn-icon" onclick="goto('s-leaderboard')" title="Leaderboard" style="font-size:18px">🏆</button>
+</div>
+<div class="page"><div class="scroll" style="padding-top:16px">
+  <div style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px">
+      <span id="h-cp-lbl">Checkpoint 1 of 5</span><span id="h-pct">0%</span>
+    </div>
+    <div class="prog"><div class="prog-fill" id="h-prog" style="width:0%"></div></div>
+  </div>
+  <div class="clue-wrap">
+    <div class="clue-lbl" id="h-clue-lbl">Checkpoint 1 — Clue</div>
+    <div class="clue-text" id="h-clue-text">...</div>
+  </div>
+  <div class="card" id="proximity-card">
+    <div class="card-lbl">Proximity radar</div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:2px"><span>❄ Far</span><span>Close 🔥</span></div>
+    <div class="temp-bar-outer"><div class="temp-bar-fill"></div><div class="temp-needle" id="h-needle" style="left:15%"></div></div>
+    <div class="temp-lbl-wrap"><div class="temp-lbl" id="h-temp-lbl">Calculating...</div><div class="temp-sub" id="h-temp-sub">Enable location for proximity</div></div>
+  </div>
+  <div class="btn-row">
+    <button class="btn" onclick="openHintFlow()">
+      <span>💡</span>
+      <div><div>Get hint</div><div style="font-size:11px;color:var(--muted);margin-top:1px" id="h-hint-lbl">+1 min penalty</div></div>
+    </button>
+    <button class="btn btn-gold" onclick="openVerifyFlow()">
+      <span>📸</span>
+      <div><div>We're here!</div><div style="font-size:11px;opacity:.7;margin-top:1px">Take team selfie</div></div>
+    </button>
+  </div>
+  <div id="h-penalty-banner" style="display:none" class="alert-box alert-amber">
+    ⚠ Time penalty: +<span id="h-penalty-val">0</span> min from <span id="h-hints-count">0</span> hint(s)
+  </div>
+</div></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- HINT PROXIMITY FLOW (bottom sheet overlay) -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-hint-overlay" style="display:none;position:fixed;inset:0;background:rgba(8,8,14,.95);z-index:200;overflow-y:auto">
+<div style="max-width:480px;margin:0 auto;padding:16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h2 style="font-size:18px">Proximity Hint</h2>
+    <button class="back-btn" onclick="closeHintOverlay()">✕</button>
+  </div>
+  <div class="alert-box alert-amber" style="margin-bottom:14px">
+    <div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">⚠ You must be within 30–40m of the location</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.6">Move around campus. The bar below updates in real time based on your GPS. Once you get close enough the hint unlocks.</div>
+  </div>
+  <div class="card">
+    <div class="card-lbl">Distance to <span id="hint-loc-name">checkpoint</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:2px"><span>❄ Far</span><span>Close 🔥</span></div>
+    <div class="temp-bar-outer"><div class="temp-bar-fill"></div><div class="temp-needle" id="hint-needle" style="left:15%"></div></div>
+    <div class="temp-lbl-wrap">
+      <div class="temp-lbl" id="hint-temp-lbl" style="font-size:20px">Searching...</div>
+      <div class="temp-sub" id="hint-dist-lbl">Getting your location...</div>
+    </div>
+  </div>
+  <div id="hint-locked" class="alert-box alert-red" style="margin-bottom:14px">
+    <div style="font-size:13px;color:var(--red);font-weight:600">🔒 Hint locked — get closer to unlock</div>
+  </div>
+  <div id="hint-unlocked" style="display:none">
+    <div class="alert-box alert-green" style="margin-bottom:12px">
+      <div style="font-size:13px;color:var(--green);font-weight:600;margin-bottom:4px">🔓 Within range! Hint available.</div>
+      <div style="font-size:13px;color:var(--muted)">Using this hint adds +1 minute to your final time.</div>
+    </div>
+    <div id="hint-text-box" style="display:none" class="alert-box alert-gold" style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:1.2px;color:var(--gold);margin-bottom:8px;font-family:'Syne',sans-serif">HINT</div>
+      <div style="font-size:14px;line-height:1.65" id="hint-text-content"></div>
+    </div>
+    <div id="hint-reveal-btn-wrap">
+      <button class="btn btn-red" onclick="revealHint()">Reveal Hint (+1 min penalty)</button>
+    </div>
+  </div>
+  <button class="btn" style="margin-top:10px" onclick="closeHintOverlay()">← Back to hunt</button>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- VERIFY FLOW (bottom sheet overlay) -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-verify-overlay" style="display:none;position:fixed;inset:0;background:rgba(8,8,14,.95);z-index:200;overflow-y:auto">
+<div style="max-width:480px;margin:0 auto;padding:16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <h2 style="font-size:18px" id="verify-title">Verify Checkpoint 1</h2>
+    <button class="back-btn" onclick="closeVerifyOverlay()">✕</button>
+  </div>
+  <div id="verify-gps-fail" style="display:none" class="alert-box alert-red" style="margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:4px">📍 Too far away</div>
+    <div style="font-size:13px;color:var(--muted)" id="verify-dist-msg"></div>
+  </div>
+  <div id="verify-cam-section">
+    <div class="alert-box alert-amber" style="margin-bottom:12px">
+      <div style="font-size:13px;font-weight:600;color:var(--amber)">All <span id="v-member-count">?</span> team members must be in the photo</div>
+    </div>
+    <div class="cam-wrap" id="v-cam-wrap">
+      <div class="cam-overlay" id="v-cam-overlay">
+        <div style="font-size:36px">📷</div>
+        <div style="font-size:14px;font-weight:600;font-family:'Syne',sans-serif">Tap to open camera</div>
+      </div>
+      <video id="v-video" style="display:none;width:100%;height:100%;object-fit:cover" playsinline></video>
+      <canvas id="v-canvas" style="display:none;width:100%;height:100%;object-fit:cover"></canvas>
+    </div>
+    <div id="v-btn-area">
+      <button class="btn" onclick="openVerifyCamera()">📷 Open Camera</button>
+    </div>
+  </div>
+  <div class="card" style="margin-top:4px">
+    <div class="card-lbl">Verification checks</div>
+    <div class="chk-row"><div class="chk-icon ci-w" id="v-gps-icon">•</div><div><div style="font-size:14px;font-weight:600">GPS location</div><div style="font-size:12px;color:var(--muted)" id="v-gps-sub">Within range of checkpoint</div></div></div>
+    <div class="chk-row"><div class="chk-icon ci-w" id="v-face-icon">•</div><div><div style="font-size:14px;font-weight:600">Team headcount</div><div style="font-size:12px;color:var(--muted)" id="v-face-sub">Matching registered team size</div></div></div>
+    <div class="chk-row"><div class="chk-icon ci-w" id="v-loc-icon">•</div><div><div style="font-size:14px;font-weight:600">Location confirmed</div><div style="font-size:12px;color:var(--muted)" id="v-loc-sub">GPS + photo analysed</div></div></div>
+  </div>
+  <div id="v-pass" style="display:none">
+    <div class="alert-box alert-green" style="text-align:center;padding:20px">
+      <div style="font-size:32px;margin-bottom:8px">✅</div>
+      <div style="font-size:18px;font-weight:700;font-family:'Syne',sans-serif;color:var(--green)">Checkpoint Verified!</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:6px" id="v-pass-msg"></div>
+    </div>
+    <button class="btn btn-gold" onclick="completeCheckpoint()">Next checkpoint →</button>
+  </div>
+  <div id="v-fail" style="display:none">
+    <div class="alert-box alert-red">
+      <div style="font-size:14px;font-weight:600;color:var(--red)" id="v-fail-msg">Verification failed</div>
+    </div>
+    <button class="btn" onclick="resetVerify()">Try Again</button>
+  </div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- CHECKPOINT DONE FLASH -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-cp-done" class="screen">
+<div class="page" style="justify-content:center;align-items:center;text-align:center;padding:32px 16px">
+  <div style="font-size:72px;margin-bottom:16px;animation:bounce .5s ease infinite alternate">🎯</div>
+  <h2 style="font-size:26px;margin-bottom:8px" id="cpd-title">Checkpoint Done!</h2>
+  <p style="font-size:14px;color:var(--muted);margin-bottom:24px" id="cpd-sub">Keep going!</p>
+  <div class="card" style="width:100%;max-width:320px;margin-bottom:20px;text-align:left">
+    <div class="card-lbl">Next clue</div>
+    <div style="font-size:14px;font-style:italic;line-height:1.65" id="cpd-next-clue"></div>
+  </div>
+  <button class="btn btn-gold" style="max-width:320px;width:100%" onclick="goto('s-hunt')">Hunt! →</button>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- HUNT COMPLETE -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-complete" class="screen">
+<div class="page" style="justify-content:center;align-items:center;text-align:center;padding:32px 16px">
+  <span class="trophy-big">🏆</span>
+  <h1 style="font-size:30px;margin:16px 0 8px;color:var(--gold)">Hunt Complete!</h1>
+  <p style="color:var(--muted);margin-bottom:24px" id="fin-team">—</p>
+  <div class="metrics" style="width:100%;max-width:360px">
+    <div class="metric"><div class="metric-val" id="fin-time">—</div><div class="metric-lbl">Hunt time</div></div>
+    <div class="metric"><div class="metric-val" id="fin-pen">+0m</div><div class="metric-lbl">Penalty</div></div>
+    <div class="metric"><div class="metric-val" id="fin-total">—</div><div class="metric-lbl">Total</div></div>
+  </div>
+  <button class="btn btn-gold" style="margin-top:20px;max-width:280px;width:100%" onclick="goto('s-leaderboard')">View Leaderboard</button>
+  <button class="btn" style="margin-top:10px;max-width:280px;width:100%" onclick="goto('s-landing')">Home</button>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- LEADERBOARD (admin-only full view via flag) -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-leaderboard" class="screen">
+<div class="topbar"><button class="back-btn" onclick="goBackFromLB()">←</button><span class="topbar-title">Leaderboard</span><span class="badge b-green" id="lb-live">Live</span></div>
+<div class="page"><div class="scroll" style="padding-top:16px">
+  <div class="metrics">
+    <div class="metric"><div class="metric-val" id="lb-fin">0</div><div class="metric-lbl">Finished</div></div>
+    <div class="metric"><div class="metric-val" id="lb-act">0</div><div class="metric-lbl">Active</div></div>
+    <div class="metric"><div class="metric-val" id="lb-best">—</div><div class="metric-lbl">Best time</div></div>
+  </div>
+  <!-- Team-only view: just my team's position -->
+  <div id="lb-my-team-only" style="display:none">
+    <div class="card" style="text-align:center">
+      <div class="card-lbl">Your position</div>
+      <div style="font-size:40px;font-weight:800;font-family:'Syne',sans-serif;color:var(--gold)" id="lb-my-rank">—</div>
+      <div style="font-size:14px;color:var(--muted)" id="lb-my-time">—</div>
+    </div>
+    <div class="alert-box alert-amber">
+      <div style="font-size:13px;color:var(--amber);font-weight:600">Full rankings visible after the hunt ends</div>
+    </div>
+  </div>
+  <!-- Admin full leaderboard -->
+  <div id="lb-full-list"></div>
+  <div id="lb-empty" style="text-align:center;padding:48px 16px;color:var(--muted)">
+    <div style="font-size:36px;margin-bottom:12px">🏁</div>
+    <div>No teams yet</div>
+  </div>
+</div></div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- ADMIN LOGIN -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-admin-login" class="screen">
+<div class="page" style="justify-content:center;align-items:center;padding:60px 32px;text-align:center">
+  <div style="font-size:48px;margin-bottom:20px">🔐</div>
+  <h2 style="font-size:22px;margin-bottom:24px">Admin Access</h2>
+  <input type="password" id="adm-pw" placeholder="Password" style="max-width:280px" onkeydown="if(event.key==='Enter')adminLogin()">
+  <div style="display:flex;gap:8px;justify-content:center;margin-top:4px">
+    <button class="btn btn-gold btn-sm" onclick="adminLogin()">Login</button>
+    <button class="btn btn-sm" onclick="goto('s-landing')">Cancel</button>
+  </div>
+  <div id="adm-err" style="color:var(--red);font-size:13px;margin-top:12px;display:none">Wrong password</div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════ -->
+<!-- ADMIN PANEL -->
+<!-- ════════════════════════════════════════════ -->
+<div id="s-admin" class="screen">
+<div class="topbar"><button class="back-btn" onclick="goto('s-landing')">←</button><span class="topbar-title">Admin Panel</span><span class="badge b-red">Admin</span></div>
+<div class="page"><div class="scroll" style="padding-top:16px">
+  <div class="metrics">
+    <div class="metric"><div class="metric-val" id="ad-total">0</div><div class="metric-lbl">Teams</div></div>
+    <div class="metric"><div class="metric-val" id="ad-pending">0</div><div class="metric-lbl">Pending</div></div>
+    <div class="metric"><div class="metric-val" id="ad-done">0</div><div class="metric-lbl">Done</div></div>
+  </div>
+  <div class="btn-row" style="margin-bottom:14px">
+    <button class="btn btn-gold" onclick="adminStartAll()">▶ Start All</button>
+    <button class="btn btn-red" onclick="adminStopAll()">⏹ Stop Hunt</button>
+  </div>
+  <div class="card">
+    <div class="card-lbl">Pending approval</div>
+    <div id="adm-pending-list"><div style="color:var(--muted);font-size:13px;padding:8px 0">No pending teams</div></div>
+  </div>
+  <div class="card">
+    <div class="card-lbl">Active teams</div>
+    <div id="adm-active-list"><div style="color:var(--muted);font-size:13px;padding:8px 0">No active teams</div></div>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="exportCSV()">Export Results CSV</button>
+      <button class="btn btn-sm btn-red" onclick="clearAllTeams()">Clear All Teams</button>
+    </div>
+  </div>
+</div></div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// GAME DATA
+// ══════════════════════════════════════════════
+const LOCS={"LOC01":"UB Building","LOC02":"Arch Gate","LOC03":"Raja Raja Chola Statue","LOC04":"NRI Hostel","LOC05":"Sports Courts","LOC06":"Chemistry Lab","LOC07":"TP Avenue","LOC08":"Java","LOC09":"Architecture Building","LOC10":"BEL Block","LOC11":"Ganesh Temple","LOC12":"Guest House","LOC13":"Architecture Ground","LOC14":"College of Pharmacy","LOC15":"Sai Baba Mandir","LOC16":"Mahatma Gandhi Statue","LOC17":"Valliammai Gate","LOC18":"Valliammai Engineering College","LOC19":"Royal Café","LOC20":"Arts and Science College","LOC21":"CV Raman Block","LOC22":"Bio Tech Engineering","LOC23":"Hotel Management","LOC24":"Gen Z Café","LOC25":"Meenakshi Hostel","LOC26":"Boys Hostel","LOC27":"Girls Hostel","LOC28":"Clock Tower","LOC29":"Shiv Mandir","LOC30":"FAB Lab","LOC31":"Bus Stand","LOC32":"Museum","LOC33":"Dominos","LOC34":"Vendhar Square","LOC35":"Law College","LOC36":"Science and Humanities","LOC37":"Auditorium","LOC38":"AgriTech","LOC39":"Hospital","LOC40":"Slice of Life","LOC41":"Swimming Pool","LOC42":"Gym","LOC43":"Dental Block","LOC44":"Dental Ground","LOC45":"Medical College","LOC46":"PF Hostel","LOC47":"TP1","LOC48":"TP2"};
+const GPS={"LOC01":[12.8231,80.0444],"LOC02":[12.8219,80.0432],"LOC03":[12.8228,80.0438],"LOC04":[12.8265,80.0458],"LOC05":[12.8241,80.0471],"LOC06":[12.8235,80.0450],"LOC07":[12.8222,80.0430],"LOC08":[12.8230,80.0442],"LOC09":[12.8245,80.0455],"LOC10":[12.8238,80.0448],"LOC11":[12.8227,80.0436],"LOC12":[12.8260,80.0440],"LOC13":[12.8247,80.0457],"LOC14":[12.8252,80.0462],"LOC15":[12.8225,80.0434],"LOC16":[12.8233,80.0445],"LOC17":[12.8215,80.0428],"LOC18":[12.8210,80.0425],"LOC19":[12.8229,80.0441],"LOC20":[12.8242,80.0453],"LOC21":[12.8237,80.0447],"LOC22":[12.8244,80.0456],"LOC23":[12.8248,80.0460],"LOC24":[12.8231,80.0443],"LOC25":[12.8263,80.0456],"LOC26":[12.8267,80.0460],"LOC27":[12.8261,80.0454],"LOC28":[12.8234,80.0446],"LOC29":[12.8226,80.0435],"LOC30":[12.8239,80.0449],"LOC31":[12.8218,80.0431],"LOC32":[12.8236,80.0446],"LOC33":[12.8228,80.0440],"LOC34":[12.8243,80.0454],"LOC35":[12.8253,80.0463],"LOC36":[12.8240,80.0451],"LOC37":[12.8232,80.0444],"LOC38":[12.8255,80.0465],"LOC39":[12.8258,80.0468],"LOC40":[12.8229,80.0442],"LOC41":[12.8250,80.0461],"LOC42":[12.8243,80.0452],"LOC43":[12.8256,80.0466],"LOC44":[12.8257,80.0467],"LOC45":[12.8259,80.0469],"LOC46":[12.8264,80.0457],"LOC47":[12.8220,80.0433],"LOC48":[12.8221,80.0434]};
+const RAD={"LOC01":35,"LOC02":20,"LOC03":15,"LOC04":40,"LOC05":50,"LOC06":30,"LOC07":35,"LOC08":25,"LOC09":35,"LOC10":30,"LOC11":15,"LOC12":30,"LOC13":45,"LOC14":35,"LOC15":15,"LOC16":15,"LOC17":20,"LOC18":40,"LOC19":20,"LOC20":40,"LOC21":35,"LOC22":35,"LOC23":35,"LOC24":20,"LOC25":40,"LOC26":40,"LOC27":40,"LOC28":15,"LOC29":15,"LOC30":25,"LOC31":30,"LOC32":30,"LOC33":20,"LOC34":25,"LOC35":35,"LOC36":40,"LOC37":50,"LOC38":35,"LOC39":40,"LOC40":20,"LOC41":35,"LOC42":25,"LOC43":30,"LOC44":40,"LOC45":40,"LOC46":35,"LOC47":20,"LOC48":20};
+const RIDDLES={"LOC01":["Where knowledge and silence coexist, your journey begins at the place filled with books.","Look for the building that houses countless stories. Find your next clue near the entrance.","In this sanctuary of learning, seek your clue among the shelves."],"LOC02":["To start your quest, find the gateway to the jungle where the vines intertwine.","Begin your journey where all explorer's paths align. Look near the gate where all stories start.","Across this threshold, many have passed, a gateway to secrets both ancient and vast."],"LOC03":["Where history stands tall at the statue honoring a great king known for art and architecture.","Look for the figure of strength and leadership, standing as a reminder of a glorious past.","This statue commemorates a ruler who expanded his empire across the seas."],"LOC04":["Where cultures blend and friendships form across borders, at the hostel that welcomes the world.","Look for the place filled with diverse voices where residents share experiences.","In this vibrant hub of global connections, seek your clue in the common area."],"LOC05":["Where athletes compete and play, at the complex where games bring everyone together.","Look for the courts where rackets swing and shuttlecocks fly.","Seek your next clue near the basketball court where teamwork shines bright."],"LOC06":["Where experiments unfold and discoveries ignite, in the lab of bubbling concoctions.","Look for the room where formulas come to life. Your clue is among the glassware.","Seek where acids fizz and bases calm, a place where reactions sing their charm."],"LOC07":["Where wheels come to rest and journeys begin, at the avenue of vehicles.","Look for the area where students park before heading to class.","The spot where campus life meets the sound of engines along the avenue."],"LOC08":["Search where jungle adventurers pause for bread — your clue is near.","In the heart of campus, where explorers feast and mingle, food stalls jingle.","Where the aroma of dishes fills the air, students gather to satisfy hunger."],"LOC09":["Where creativity meets structure, in the block that shapes visionaries of tomorrow.","Seek where models rise, with rulers, pens and measured eyes.","Walls of sketches, lines so neat — here designs and ideas meet."],"LOC10":["In the vibrant pink-walled structure, seek where sparks dance and dreams beam.","In the pink building where innovation is spun, look for where metal is won.","Where circuits come to life — your journey begins at the lab of wonders."],"LOC11":["Where wisdom and new beginnings are honored, at the temple of obstacle removal.","Look for the sacred space adorned with images of the lord of intellect.","In this serene temple, find your clue near the area of offerings."],"LOC12":["Not a hostel, not a class, but a place where visitors rest at last.","Where parents stay when they come to see their children's future at SRM.","A home away from home, with comfort and care — find the key here."],"LOC13":["Where ideas turn into walls and beams — the birthplace of builders' dreams.","Before the cement, before the stone, designs are drawn in this creative zone.","Not just buildings but imagination too begins on the field that waits for you."],"LOC14":["Healing begins where formulas are made, tablets and tonics carefully laid.","Not a hospital, but close you'll see — this college prepares your remedy.","If chemistry met care, they'd form this place where medicines start their race."],"LOC15":["Where devotees find peace in Sai Baba's grace, seek your clue in this holy place.","In the calm of devotion, where incense meets prayers, find the clue in the air.","At the feet of the saint who preached unity, your clue waits beneath spirituality."],"LOC16":["Where the father of the nation stands in silent vigil, find the clue at his base.","Beneath the gaze of the man who led a nation to freedom, your next clue awaits.","Where nonviolence and truth reign, look for the great leader's tribute."],"LOC17":["Find the boundary where one campus ends and another's story begins.","Not ours, yet next to ours — find the gate where neighbors part ways.","Where the road divides two worlds of learning, seek your clue."],"LOC18":["Across the boundary lies another hall of learning. Seek the neighboring gate.","Where a different institution stands, find the clue near its entrance.","Not SRM, but close enough to see — find the clue at this academy."],"LOC19":["Where royalty meets refreshment, find the café where campus royalty refuels.","In this café fit for kings, your next clue awaits near the counter.","Where students take a royal break from studies, your clue is hidden here."],"LOC20":["Where art meets science in academic harmony, at this multi-discipline college.","Find the building where arts and sciences students learn side by side.","In this junction of creative and analytical minds, seek your next clue."],"LOC21":["Named after the scientist who discovered the Raman Effect — find this block.","In honor of India's Nobel laureate, this block bears his name.","Where light scatters and science shines, named for the man who explained it."],"LOC22":["Where life sciences and engineering merge, at the biotech block.","Find the building where biotechnology shapes the future of medicine.","In this hub of biological innovation, seek your clue near the entrance."],"LOC23":["Where culinary arts meet hospitality, find the hotel management building.","In this school of service and cuisine, your clue awaits near the kitchens.","Where future hoteliers and chefs learn their trade, find your checkpoint."],"LOC24":["Where Gen Z sips coffee and refreshes between classes, find the trendy café.","This café caters to the youngest generation. Find your clue at the counter.","Where memes are discussed over cold brew, your next clue awaits."],"LOC25":["Where young women find their campus home away from home, seek this hostel.","Named after the goddess of prosperity, this hostel houses the women of SRM.","In the comfort of Meenakshi's abode, seek your clue near the entrance."],"LOC26":["Where brothers in campus life dwell together, find the boys' hostel gate.","In this home of campus brotherhood, your next clue awaits at the gate.","Where late-night studies and friendships are formed, seek the clue."],"LOC27":["Where sisters of SRM reside, find your clue at the girls' hostel.","In the safe haven of sisterhood, your next checkpoint awaits.","Where friendships bloom and studies intensify, find your clue here."],"LOC28":["Where time itself keeps watch over campus, seek the clue near the tall tower.","Beneath the face that marks each passing hour, your clue awaits.","Find the structure where every student checks the time between classes."],"LOC29":["Where Shiva's blessings calm the storms of exam season, find this mandir.","In the calm presence of the destroyer and creator, seek your clue.","Where devotees ring bells and offer flowers to Lord Shiva, find the checkpoint."],"LOC30":["Where fabrication meets innovation, at the campus lab of makers.","Find the lab where 3D printers hum and laser cutters work their magic.","In this workshop of the future, prototypes are born. Seek your clue here."],"LOC31":["Where all journeys end and new ones begin, at the campus transport hub.","This is where students wait for their buses home. Find the clue near the stop.","Where wheels and schedules converge, your next clue awaits."],"LOC32":["Where artifacts of history and knowledge are preserved under one roof.","In the hall where the past is displayed for all to learn, find your checkpoint.","Where exhibits tell stories textbooks cannot, your clue awaits."],"LOC33":["Where pizza lovers unite and hunger is defeated, find the cheesy clue.","At the home of slices and dough, your next clue is near the counter.","Where cheesy dreams come true on campus, find your next checkpoint."],"LOC34":["Where the square gets its name from the vendor, at this campus landmark.","Find the spot where students gather for snacks at Vendhar Square.","In this social hub of campus, your clue waits nearby."],"LOC35":["Where future lawyers study the constitution and argue their cases.","Find the building dedicated to legal studies and justice on campus.","Where statutes are studied and debates ignite, your next clue awaits."],"LOC36":["Where science and humanities share the same hallways, find this block.","In the intersection of logical and creative learning, seek your clue.","Where physicists and poets share corridors, find your checkpoint."],"LOC37":["Where performances come to life and graduation ceremonies unfold.","In the campus stage where the biggest events happen, seek your clue.","Find the hall where speakers inspire and artists perform for SRM."],"LOC38":["Where agriculture meets technology, at the agri-tech building.","Find the block where farming innovations are studied and developed.","In this field of agricultural science, seek your next clue."],"LOC39":["Where healing and health sciences come together, find the campus hospital.","In the building where white coats and stethoscopes are common, seek your clue.","Where wellness is the mission and health is the goal, find the checkpoint."],"LOC40":["A slice of calm amidst academic chaos — find this eatery and clue.","Where students take a Slice of Life between lectures, find your clue.","In this eatery where refreshment meets relaxation, seek the next stop."],"LOC41":["Where swimmers train and blue water shimmers under open sky, find your clue.","Seek the pool where laps are counted and records broken.","Where chlorine and competition fill the air, find your checkpoint."],"LOC42":["Where iron is lifted and bodies are sculpted, find the campus fitness hub.","In the hall of weights and cardio, your clue awaits near the entrance.","Where fitness goals are set and exceeded, find your next stop."],"LOC43":["Where smiles are studied and teeth are the subject, find the dental block.","In the building where future dentists practice their craft, seek your clue.","Where the drill meets education, your next checkpoint waits."],"LOC44":["Where dental students practice outdoor skills, find this ground.","In the open area beside the dental block, seek your next clue.","Where the dental college meets open air, your checkpoint is here."],"LOC45":["Where future doctors walk the corridors of learning, find the medical college.","In the institution that trains the healers of tomorrow, seek your clue.","Where MBBS dreams are forged in hard work and anatomy, find your stop."],"LOC46":["Where PF students make their campus home, find this hostel.","In the residence of the PF block students, your clue awaits.","Where hostel life meets academic grind, seek your next checkpoint."],"LOC47":["Your journey begins and ends at TP1 — the starting flag of every great hunt.","The alpha and omega of your adventure — return here when your hunt is done.","Where all trails begin and champions return — TP1 awaits you."],"LOC48":["The second teaching point, a landmark close to where it all starts.","Near the starting point lies another pillar — TP2.","Where the second post stands, a new adventure begins."]};
+const HINTS={"LOC01":"UB Building is the main tall academic block near the campus center. Main entrance steps.","LOC02":"Arch Gate is the large archway at the main campus road entry.","LOC03":"Raja Raja Chola statue is in the open central area near the main road inside campus.","LOC04":"NRI Hostel is in the northern part of campus near the boundary — large residential block.","LOC05":"Sports courts are east of the main academic buildings — look for the multi-sport facility.","LOC06":"Chemistry Lab is in the science block. Look for the building with lab safety signs.","LOC07":"TP Avenue is the main road/parking strip near TP1 at the campus entry.","LOC08":"Java is a popular food court area near the central academic zone.","LOC09":"Architecture Building has a distinctive creative exterior with models visible outside.","LOC10":"BEL Block is the PINK building — very easy to spot from a distance.","LOC11":"Ganesh Temple is a small temple inside campus near the main academic area.","LOC12":"Guest House is near the campus boundary — for visiting parents and faculty.","LOC13":"Architecture Ground is the large open field next to the Architecture Building.","LOC14":"College of Pharmacy is on the southern side near the hospital and medical buildings.","LOC15":"Sai Baba Mandir is a small temple in the residential zone of campus.","LOC16":"Mahatma Gandhi statue stands in the central plaza of campus.","LOC17":"Valliammai Gate is on the campus boundary wall facing the Valliammai college side.","LOC18":"Valliammai Engineering College is the neighboring institution right next to SRM KTR.","LOC19":"Royal Café is near the main academic blocks — a popular student hangout.","LOC20":"Arts and Science College block is in the academic zone of SRM campus.","LOC21":"CV Raman Block — look for his name or photo on the building.","LOC22":"Bio Tech Engineering is in the life sciences cluster of campus buildings.","LOC23":"Hotel Management building is where hospitality and culinary students study.","LOC24":"Gen Z Café is a trendy student café — look for the modern signage.","LOC25":"Meenakshi Hostel is the women's hostel in the residential zone.","LOC26":"Boys Hostel is in the residential area of campus, away from academic buildings.","LOC27":"Girls Hostel is in the residential zone — secured area.","LOC28":"Clock Tower is a vertical landmark visible from most parts of campus.","LOC29":"Shiv Mandir is a temple dedicated to Lord Shiva inside campus.","LOC30":"FAB Lab is the fabrication and maker space — 3D printers and laser cutters inside.","LOC31":"Bus Stand is the main transport hub near the campus exit.","LOC32":"Museum is the exhibition building on campus.","LOC33":"Dominos is the pizza outlet near the campus food zone.","LOC34":"Vendhar Square is a social gathering spot in the campus leisure area.","LOC35":"Law College is the legal studies block on campus.","LOC36":"Science and Humanities block houses non-engineering academic departments.","LOC37":"Auditorium is the largest performance hall — main stage building.","LOC38":"AgriTech building is where agricultural science students study.","LOC39":"Hospital is the campus medical facility — health center building.","LOC40":"Slice of Life is a café on campus — popular student hangout.","LOC41":"Swimming Pool is the campus aquatic facility — pool complex.","LOC42":"Gym is the campus fitness center near the sports complex.","LOC43":"Dental Block is part of the medical campus — dental college building.","LOC44":"Dental Ground is the open area directly adjacent to the Dental Block.","LOC45":"Medical College is the main medical education building on the southern side.","LOC46":"PF Hostel — look for PF block signage in the residential zone.","LOC47":"TP1 — Teaching Post 1 — start and finish point near the main campus entry road.","LOC48":"TP2 is close to TP1 — the second teaching post landmark near the main entry."};
+const ROUTES=[{name:"Route 1",stops:["LOC47","LOC04","LOC41","LOC24","LOC22","LOC32","LOC47"]},{name:"Route 2",stops:["LOC47","LOC41","LOC32","LOC09","LOC23","LOC22","LOC47"]},{name:"Route 3",stops:["LOC47","LOC14","LOC35","LOC13","LOC41","LOC29","LOC47"]},{name:"Route 4",stops:["LOC47","LOC24","LOC40","LOC07","LOC32","LOC19","LOC47"]},{name:"Route 5",stops:["LOC47","LOC29","LOC40","LOC09","LOC18","LOC35","LOC47"]},{name:"Route 6",stops:["LOC47","LOC39","LOC26","LOC35","LOC05","LOC15","LOC47"]},{name:"Route 7",stops:["LOC47","LOC19","LOC03","LOC43","LOC28","LOC32","LOC47"]},{name:"Route 8",stops:["LOC47","LOC25","LOC08","LOC45","LOC32","LOC22","LOC47"]},{name:"Route 9",stops:["LOC47","LOC19","LOC29","LOC05","LOC32","LOC41","LOC47"]},{name:"Route 10",stops:["LOC47","LOC46","LOC25","LOC05","LOC16","LOC32","LOC47"]},{name:"Route 11",stops:["LOC47","LOC43","LOC26","LOC32","LOC22","LOC08","LOC47"]},{name:"Route 12",stops:["LOC47","LOC13","LOC45","LOC36","LOC24","LOC20","LOC47"]},{name:"Route 13",stops:["LOC47","LOC37","LOC40","LOC31","LOC18","LOC13","LOC47"]},{name:"Route 14",stops:["LOC47","LOC30","LOC01","LOC18","LOC41","LOC36","LOC47"]},{name:"Route 15",stops:["LOC47","LOC06","LOC25","LOC36","LOC39","LOC19","LOC47"]},{name:"Route 16",stops:["LOC47","LOC32","LOC01","LOC41","LOC15","LOC24","LOC47"]},{name:"Route 17",stops:["LOC47","LOC37","LOC08","LOC31","LOC41","LOC18","LOC47"]},{name:"Route 18",stops:["LOC47","LOC45","LOC37","LOC11","LOC28","LOC21","LOC47"]},{name:"Route 19",stops:["LOC47","LOC40","LOC32","LOC01","LOC31","LOC17","LOC47"]},{name:"Route 20",stops:["LOC47","LOC41","LOC15","LOC01","LOC28","LOC32","LOC47"]},{name:"Route 21",stops:["LOC47","LOC41","LOC21","LOC32","LOC30","LOC13","LOC47"]},{name:"Route 22",stops:["LOC47","LOC32","LOC20","LOC07","LOC30","LOC39","LOC47"]},{name:"Route 23",stops:["LOC47","LOC04","LOC41","LOC17","LOC31","LOC35","LOC47"]},{name:"Route 24",stops:["LOC47","LOC17","LOC35","LOC02","LOC46","LOC31","LOC47"]},{name:"Route 25",stops:["LOC47","LOC13","LOC41","LOC25","LOC35","LOC21","LOC47"]},{name:"Route 26",stops:["LOC47","LOC35","LOC14","LOC45","LOC05","LOC30","LOC47"]},{name:"Route 27",stops:["LOC47","LOC26","LOC32","LOC41","LOC14","LOC10","LOC47"]},{name:"Route 28",stops:["LOC47","LOC39","LOC10","LOC30","LOC22","LOC35","LOC47"]},{name:"Route 29",stops:["LOC47","LOC40","LOC15","LOC11","LOC26","LOC35","LOC47"]},{name:"Route 30",stops:["LOC47","LOC07","LOC22","LOC28","LOC43","LOC32","LOC47"]},{name:"Route 31",stops:["LOC47","LOC27","LOC21","LOC32","LOC40","LOC01","LOC47"]},{name:"Route 32",stops:["LOC47","LOC32","LOC06","LOC40","LOC26","LOC19","LOC47"]},{name:"Route 33",stops:["LOC47","LOC31","LOC18","LOC37","LOC40","LOC03","LOC47"]},{name:"Route 34",stops:["LOC47","LOC27","LOC10","LOC32","LOC43","LOC17","LOC47"]},{name:"Route 35",stops:["LOC47","LOC29","LOC35","LOC18","LOC01","LOC39","LOC47"]},{name:"Route 36",stops:["LOC47","LOC30","LOC22","LOC45","LOC36","LOC01","LOC47"]},{name:"Route 37",stops:["LOC47","LOC06","LOC41","LOC29","LOC32","LOC14","LOC47"]},{name:"Route 38",stops:["LOC47","LOC26","LOC40","LOC06","LOC22","LOC35","LOC47"]},{name:"Route 39",stops:["LOC47","LOC35","LOC14","LOC03","LOC28","LOC45","LOC47"]},{name:"Route 40",stops:["LOC47","LOC14","LOC30","LOC04","LOC32","LOC46","LOC47"]}];
+
+const ADMIN_PW = 'srm2024';
+const HINT_UNLOCK_DIST = 40; // meters — unlock hint when within 40m
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+let S = {
+  teamId: localStorage.getItem('th_teamId') || null,
+  teamName: '', leaderName: '', members: [],
+  teamPhotoUrl: '', faceCount: 0,
+  assignedRoute: null, cpIndex: 0,
+  startTime: null, elapsed: 0, timerInt: null,
+  penalty: 0, hintsUsed: 0, hintUsedForCurrent: false,
+  gpsPos: null, gpsWatch: null,
+  tempSimInt: null, tempPos: 15,
+  camStream: null,
+  isAdmin: false,
+  hintOverlayOpen: false,
+  verifyOverlayOpen: false,
+  verifyStep: 0,
+  verifyCamStream: null,
+  capturedPhotoBlob: null,
+  capturedVerifyBlob: null,
+  regPhotoBlob: null,
+};
+
+// ══════════════════════════════════════════════
+// FIREBASE HELPERS
+// ══════════════════════════════════════════════
+async function fbSet(path, data) {
+  const {doc, setDoc} = window.FB;
+  await setDoc(doc(window.DB, ...path.split('/')), data);
+}
+async function fbUpdate(path, data) {
+  const {doc, updateDoc} = window.FB;
+  await updateDoc(doc(window.DB, ...path.split('/')), data);
+}
+async function fbGet(path) {
+  const {doc, getDoc} = window.FB;
+  const snap = await getDoc(doc(window.DB, ...path.split('/')));
+  return snap.exists() ? snap.data() : null;
+}
+function fbListen(path, cb) {
+  const {doc, onSnapshot} = window.FB;
+  return onSnapshot(doc(window.DB, ...path.split('/')), snap => cb(snap.exists() ? snap.data() : null));
+}
+function fbListenCol(colPath, cb) {
+  const {collection, onSnapshot, query, orderBy} = window.FB;
+  const q = query(collection(window.DB, colPath), orderBy('registeredAt', 'desc'));
+  return onSnapshot(q, snap => cb(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+}
+async function fbUpload(path, blob) {
+  const {ref, uploadBytes, getDownloadURL} = window.FB;
+  const r = ref(window.STORAGE, path);
+  await uploadBytes(r, blob);
+  return getDownloadURL(r);
+}
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+function goto(id) {
+  stopGPS(); stopTempSim(); clearInterval(S.timerInt);
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if(el) el.classList.add('active');
+  window.scrollTo(0,0);
+  if(id === 's-hunt') enterHunt();
+  if(id === 's-leaderboard') enterLeaderboard();
+  if(id === 's-admin') enterAdmin();
+  if(id === 's-waiting') enterWaiting();
+}
+
+function goBackFromLB() {
+  if(S.isAdmin) goto('s-admin');
+  else if(S.startTime) goto('s-hunt');
+  else goto('s-landing');
+}
+
+function continueHunt() {
+  if(!S.teamId){ toast('Register your team first'); goto('s-register'); return; }
+  goto('s-hunt');
+}
+
+// ══════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════
+function toast(msg, dur=2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ══════════════════════════════════════════════
+// GPS
+// ══════════════════════════════════════════════
+function startGPS(cb) {
+  if(!navigator.geolocation){ toast('GPS not supported'); return; }
+  if(S.gpsWatch) navigator.geolocation.clearWatch(S.gpsWatch);
+  S.gpsWatch = navigator.geolocation.watchPosition(
+    pos => { S.gpsPos = pos.coords; if(cb) cb(pos.coords); },
+    err => { S.gpsPos = null; toast('GPS error: '+err.message); },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+}
+function stopGPS() {
+  if(S.gpsWatch){ navigator.geolocation.clearWatch(S.gpsWatch); S.gpsWatch = null; }
+}
+function haversine(lat1, lon1, lat2, lon2) {
+  const R=6371000,p=Math.PI/180;
+  const dLat=(lat2-lat1)*p, dLon=(lon2-lon1)*p;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*p)*Math.cos(lat2*p)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function distToCurrentCP() {
+  if(!S.gpsPos || !S.assignedRoute) return Infinity;
+  const stops = S.assignedRoute.stops;
+  const loc = stops[S.cpIndex + 1];
+  const coord = GPS[loc];
+  if(!coord) return Infinity;
+  return haversine(S.gpsPos.latitude, S.gpsPos.longitude, coord[0], coord[1]);
+}
+
+// ══════════════════════════════════════════════
+// TEMP / HOT-COLD BAR
+// ══════════════════════════════════════════════
+function distToPercent(dist) {
+  // dist=0 → 100%, dist=200+ → 0%
+  return Math.max(0, Math.min(100, 100 - (dist / 2)));
+}
+function updateTempBar(pct, needleId, lblId, subId) {
+  const needle = document.getElementById(needleId);
+  const lbl = document.getElementById(lblId);
+  const sub = document.getElementById(subId);
+  if(needle) needle.style.left = pct + '%';
+  let label, color, sublabel = '';
+  if(pct < 15){ label='Freezing'; color='#3B82F6'; }
+  else if(pct < 28){ label='Ice Cold'; color='#60A5FA'; }
+  else if(pct < 42){ label='Cold'; color='#7DD3FC'; }
+  else if(pct < 55){ label='Cool'; color='#6EE7B7'; }
+  else if(pct < 65){ label='Warm'; color='#FBBF24'; }
+  else if(pct < 76){ label='Hot'; color='#F97316'; }
+  else if(pct < 86){ label='Very Hot!'; color='#EF4444'; sublabel='Getting very close...'; }
+  else { label='Burning!! 🔥'; color='#DC2626'; sublabel='You are RIGHT THERE!'; }
+  if(lbl){ lbl.textContent = label; lbl.style.color = color; }
+  if(sub) sub.textContent = sublabel;
+}
+function startTempSim() {
+  // Simulated drift when no GPS — for demo/indoor use
+  let t = S.tempPos, dir = 1;
+  S.tempSimInt = setInterval(() => {
+    if(S.gpsPos) return; // GPS takes over when available
+    t += dir * (Math.random()*3+1);
+    if(t>88){t=88;dir=-1;} if(t<10){t=10;dir=1;}
+    if(Math.random()<0.04) dir*=-1;
+    t = Math.round(t); S.tempPos = t;
+    const pct = t;
+    updateTempBar(pct, 'h-needle', 'h-temp-lbl', 'h-temp-sub');
+    if(document.getElementById('hint-needle'))
+      updateTempBar(pct, 'hint-needle', 'hint-temp-lbl', null);
+  }, 900);
+}
+function stopTempSim(){ clearInterval(S.tempSimInt); }
+function updateGPSTempBars() {
+  const dist = distToCurrentCP();
+  const pct = distToPercent(dist);
+  updateTempBar(pct, 'h-needle', 'h-temp-lbl', 'h-temp-sub');
+  const hSub = document.getElementById('h-temp-sub');
+  if(hSub && dist !== Infinity) hSub.textContent = Math.round(dist) + 'm away';
+  if(S.hintOverlayOpen) {
+    updateTempBar(pct, 'hint-needle', 'hint-temp-lbl', null);
+    const hd = document.getElementById('hint-dist-lbl');
+    if(hd) hd.textContent = dist !== Infinity ? Math.round(dist)+'m away' : 'Getting GPS...';
+    checkHintUnlock(dist);
+  }
+}
+function checkHintUnlock(dist) {
+  const locked = document.getElementById('hint-locked');
+  const unlocked = document.getElementById('hint-unlocked');
+  if(!locked||!unlocked) return;
+  if(dist <= HINT_UNLOCK_DIST) {
+    locked.style.display = 'none';
+    unlocked.style.display = 'block';
+  } else {
+    locked.style.display = 'block';
+    unlocked.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════
+// TIMER
+// ══════════════════════════════════════════════
+function fmt(s){ return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); }
+function startTimer() {
+  clearInterval(S.timerInt);
+  if(!S.startTime) S.startTime = Date.now() - S.elapsed * 1000;
+  S.timerInt = setInterval(() => {
+    S.elapsed = Math.floor((Date.now() - S.startTime) / 1000);
+    const el = document.getElementById('h-timer');
+    if(el) el.textContent = fmt(S.elapsed);
+    // Sync to Firebase every 30s
+    if(S.elapsed % 30 === 0 && S.teamId) {
+      fbUpdate('teams/' + S.teamId, { elapsed: S.elapsed }).catch(()=>{});
+    }
+  }, 1000);
+}
+
+// ══════════════════════════════════════════════
+// CAMERA HELPERS
+// ══════════════════════════════════════════════
+async function openCamera(videoId, overlayId, btnAreaId, onOpen) {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width:{ideal:1280}, height:{ideal:720} },
+      audio: false
+    });
+    const video = document.getElementById(videoId);
+    video.srcObject = stream;
+    video.style.display = 'block';
+    video.play();
+    const overlay = document.getElementById(overlayId);
+    if(overlay) overlay.style.display = 'none';
+    if(onOpen) onOpen(stream);
+    return stream;
+  } catch(e) {
+    // Try front camera fallback
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+      const video = document.getElementById(videoId);
+      video.srcObject = stream;
+      video.style.display = 'block';
+      video.play();
+      const overlay = document.getElementById(overlayId);
+      if(overlay) overlay.style.display = 'none';
+      if(onOpen) onOpen(stream);
+      return stream;
+    } catch(e2) {
+      toast('Camera access denied. Please allow camera in browser settings.');
+      return null;
+    }
+  }
+}
+function captureFrame(videoId, canvasId) {
+  const v = document.getElementById(videoId);
+  const c = document.getElementById(canvasId);
+  c.width = v.videoWidth || 640;
+  c.height = v.videoHeight || 480;
+  c.getContext('2d').drawImage(v, 0, 0);
+  c.style.display = 'block';
+  v.style.display = 'none';
+  return new Promise(res => c.toBlob(b => res(b), 'image/jpeg', 0.85));
+}
+function stopStream(stream) {
+  if(stream) stream.getTracks().forEach(t => t.stop());
+}
+
+// ══════════════════════════════════════════════
+// FACE API — COUNT FACES
+// ══════════════════════════════════════════════
+let faceApiLoaded = false;
+async function loadFaceApi() {
+  if(faceApiLoaded) return;
+  const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
+  try {
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    faceApiLoaded = true;
+  } catch(e) {
+    console.warn('face-api load failed, will use fallback');
+  }
+}
+async function countFaces(blob) {
+  try {
+    await loadFaceApi();
+    if(!faceApiLoaded) return -1;
+    const img = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width; canvas.height = img.height;
+    canvas.getContext('2d').drawImage(img, 0, 0);
+    const detections = await faceapi.detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize:416, scoreThreshold:0.4 }));
+    return detections.length;
+  } catch(e) {
+    return -1; // -1 = couldn't determine
+  }
+}
+
+// ══════════════════════════════════════════════
+// ROUTE ASSIGNMENT (6-team cooldown)
+// ══════════════════════════════════════════════
+async function assignRoute() {
+  const teamsSnap = await window.FB.getDocs(window.FB.collection(window.DB, 'teams'));
+  const allTeams = teamsSnap.docs.map(d => d.data());
+  // Get last 6 routes used
+  const sorted = allTeams.sort((a,b) => (b.registeredAt?.seconds||0)-(a.registeredAt?.seconds||0));
+  const recentRoutes = sorted.slice(0,6).map(t => t.routeName).filter(Boolean);
+  const available = ROUTES.filter(r => !recentRoutes.includes(r.name));
+  const pool = available.length > 0 ? available : ROUTES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ══════════════════════════════════════════════
+// REGISTRATION — STEP 1
+// ══════════════════════════════════════════════
+function toggleAddForm() {
+  const f = document.getElementById('add-form');
+  const b = document.getElementById('add-btn');
+  const show = f.style.display === 'none';
+  f.style.display = show ? 'block' : 'none';
+  b.textContent = show ? '− Cancel' : '+ Add member';
+  if(show) document.getElementById('m-name').focus();
+}
+function addMember() {
+  const n = document.getElementById('m-name')?.value?.trim();
+  const r = document.getElementById('m-reg')?.value?.trim();
+  const p = document.getElementById('m-phone')?.value?.trim();
+  const e = document.getElementById('m-email')?.value?.trim();
+  if(!n){ toast('Enter member name'); return; }
+  S.members.push({name:n, reg:r||'—', phone:p||'—', email:e||'—'});
+  renderMembers();
+  ['m-name','m-reg','m-phone','m-email'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  toggleAddForm();
+}
+function removeMember(i) {
+  S.members.splice(i,1);
+  renderMembers();
+}
+function renderMembers() {
+  const list = document.getElementById('members-list');
+  if(!list) return;
+  list.innerHTML = S.members.map((m,i) => `
+    <div class="member-row">
+      <div class="av">${m.name[0].toUpperCase()}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.name}</div>
+        <div style="font-size:12px;color:var(--muted)">${m.reg}</div>
+      </div>
+      <button class="btn btn-icon btn-sm" onclick="removeMember(${i})" style="color:var(--red);flex-shrink:0;font-size:18px">×</button>
+    </div>`).join('');
+  const nb = document.getElementById('reg-next');
+  if(nb) nb.disabled = S.members.length < 1 || !document.getElementById('r-team')?.value?.trim();
+}
+
+function goToPhotoStep() {
+  const t = document.getElementById('r-team')?.value?.trim();
+  const l = document.getElementById('r-leader')?.value?.trim();
+  if(!t||!l){ toast('Fill team name and leader name'); return; }
+  if(S.members.length < 1){ toast('Add at least one team member'); return; }
+  S.teamName = t; S.leaderName = l;
+  goto('s-photo');
+  // Reset photo state
+  S.regPhotoBlob = null; S.faceCount = 0;
+  document.getElementById('photo-submit').disabled = true;
+  document.getElementById('face-result').style.display='none';
+  document.getElementById('face-error').style.display='none';
+  document.getElementById('photo-canvas').style.display='none';
+  document.getElementById('photo-video').style.display='none';
+  document.getElementById('photo-cam-overlay').style.display='flex';
+  document.getElementById('open-cam-btn').style.display='flex';
+  document.getElementById('open-cam-btn').textContent='📷 Open Camera';
+}
+
+// ══════════════════════════════════════════════
+// REGISTRATION — STEP 2 (TEAM PHOTO)
+// ══════════════════════════════════════════════
+async function openTeamCamera() {
+  const btn = document.getElementById('open-cam-btn');
+  if(S.camStream) {
+    // Take photo
+    btn.textContent='⏳ Analysing...';
+    btn.disabled = true;
+    const blob = await captureFrame('photo-video','photo-canvas');
+    stopStream(S.camStream); S.camStream = null;
+    S.regPhotoBlob = blob;
+    // Count faces
+    toast('Counting faces...');
+    const count = await countFaces(blob);
+    S.faceCount = count === -1 ? S.members.length : count; // fallback to declared count
+    const fr = document.getElementById('face-result');
+    const fe = document.getElementById('face-error');
+    const pBtn = document.getElementById('photo-submit');
+    if(count === -1) {
+      // Can't detect — allow with warning
+      fr.style.display = 'block';
+      document.getElementById('face-result-text').textContent = `✓ Photo captured! Face detection unavailable — photo accepted. ${S.members.length} member(s) registered.`;
+      pBtn.disabled = false;
+    } else if(count < S.members.length) {
+      fe.style.display='block'; fr.style.display='none';
+      document.getElementById('face-error-text').textContent = `Only ${count} face(s) detected but you have ${S.members.length} member(s). Make sure everyone is visible!`;
+      pBtn.disabled = true;
+      btn.textContent='📷 Retake Photo'; btn.disabled=false;
+    } else {
+      fr.style.display='block'; fe.style.display='none';
+      document.getElementById('face-result-text').textContent = `✓ ${count} face(s) detected — all ${S.members.length} member(s) confirmed!`;
+      pBtn.disabled = false;
+    }
+    btn.textContent = '📷 Retake Photo'; btn.disabled = false;
+    return;
+  }
+  // Open camera
+  S.camStream = await openCamera('photo-video','photo-cam-overlay','open-cam-btn', () => {
+    btn.textContent = '📸 Capture Photo';
+  });
+}
+
+async function submitRegistration() {
+  const btn = document.getElementById('photo-submit');
+  btn.disabled = true; btn.textContent = 'Registering...';
+  try {
+    const route = await assignRoute();
+    S.assignedRoute = route;
+    const teamId = 'team_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    S.teamId = teamId;
+    localStorage.setItem('th_teamId', teamId);
+    // Upload photo
+    let photoUrl = '';
+    if(S.regPhotoBlob) {
+      photoUrl = await fbUpload('team-photos/' + teamId + '.jpg', S.regPhotoBlob);
+    }
+    S.teamPhotoUrl = photoUrl;
+    const teamData = {
+      teamId, teamName: S.teamName, leaderName: S.leaderName,
+      members: S.members, faceCount: S.faceCount,
+      teamPhotoUrl: photoUrl, routeName: route.name,
+      status: 'pending', cpIndex: 0, elapsed: 0, penalty: 0,
+      registeredAt: window.FB.serverTimestamp(),
+    };
+    await fbSet('teams/' + teamId, teamData);
+    toast('Registration submitted!');
+    goto('s-waiting');
+  } catch(e) {
+    toast('Error: ' + e.message);
+    btn.disabled = false; btn.textContent = 'Submit Registration →';
+  }
+}
+
+// ══════════════════════════════════════════════
+// WAITING SCREEN
+// ══════════════════════════════════════════════
+let waitUnsub = null;
+function enterWaiting() {
+  if(!S.teamId) return;
+  const tn = document.getElementById('wait-team-name');
+  const rn = document.getElementById('wait-route');
+  const mc = document.getElementById('wait-members-chips');
+  if(tn) tn.textContent = S.teamName;
+  if(rn) rn.textContent = S.assignedRoute ? S.assignedRoute.name + ' · ' + (S.assignedRoute.stops.length-2) + ' checkpoints' : '—';
+  if(mc) mc.innerHTML = S.members.map(m=>`<span class="badge b-dim" style="margin:3px 3px 0 0">${m.name.split(' ')[0]}</span>`).join('');
+
+  if(waitUnsub) waitUnsub();
+  waitUnsub = fbListen('teams/' + S.teamId, data => {
+    if(!data) return;
+    const approved = data.status === 'active' || data.status === 'started';
+    const ac = document.getElementById('wait-approved-card');
+    const sb = document.getElementById('start-hunt-btn');
+    if(approved) {
+      if(ac) ac.style.display = 'block';
+      if(sb) sb.style.display = 'flex';
+      document.getElementById('wait-title').textContent = 'Ready to hunt!';
+      document.getElementById('wait-sub').textContent = 'Admin has given the go! Start running.';
+    }
+  });
+}
+function startHunt() {
+  S.cpIndex = 0; S.penalty = 0; S.hintsUsed = 0;
+  S.hintUsedForCurrent = false; S.startTime = null; S.elapsed = 0;
+  S.tempPos = 10 + Math.random() * 20;
+  if(waitUnsub){ waitUnsub(); waitUnsub=null; }
+  goto('s-hunt');
+}
+
+// ══════════════════════════════════════════════
+// HUNT SCREEN
+// ══════════════════════════════════════════════
+function enterHunt() {
+  if(!S.assignedRoute) { goto('s-landing'); return; }
+  const checkpoints = S.assignedRoute.stops.slice(1,-1);
+  const locId = checkpoints[S.cpIndex];
+  const tn = document.getElementById('h-team-name');
+  const rl = document.getElementById('h-route-lbl');
+  const cl = document.getElementById('h-cp-lbl');
+  const pp = document.getElementById('h-pct');
+  const prog = document.getElementById('h-prog');
+  const clueL = document.getElementById('h-clue-lbl');
+  const clueT = document.getElementById('h-clue-text');
+  const pb = document.getElementById('h-penalty-banner');
+  const pv = document.getElementById('h-penalty-val');
+  const hc = document.getElementById('h-hints-count');
+  const hl = document.getElementById('h-hint-lbl');
+  if(tn) tn.textContent = S.teamName;
+  if(rl) rl.textContent = S.assignedRoute.name;
+  if(cl) cl.textContent = 'Checkpoint '+(S.cpIndex+1)+' of '+checkpoints.length;
+  const pct = Math.round(S.cpIndex/checkpoints.length*100);
+  if(pp) pp.textContent = pct+'%';
+  if(prog) prog.style.width = pct+'%';
+  if(clueL) clueL.textContent = 'Checkpoint '+(S.cpIndex+1)+' — Clue';
+  const riddles = RIDDLES[locId] || ['Find this location on campus.'];
+  if(clueT) clueT.textContent = '"' + riddles[S.cpIndex % riddles.length] + '"';
+  if(pb) pb.style.display = S.penalty > 0 ? 'block' : 'none';
+  if(pv) pv.textContent = S.penalty;
+  if(hc) hc.textContent = S.hintsUsed;
+  if(hl) hl.textContent = S.hintsUsed > 0 ? S.hintsUsed+' hint'+(S.hintsUsed>1?'s':'')+' used (+'+S.hintsUsed+'m)' : '+1 min penalty';
+  startTimer();
+  startTempSim();
+  // Start GPS
+  startGPS(() => updateGPSTempBars());
+  setInterval(() => updateGPSTempBars(), 2000);
+}
+
+// ══════════════════════════════════════════════
+// HINT FLOW
+// ══════════════════════════════════════════════
+function openHintFlow() {
+  if(S.hintUsedForCurrent){ toast('Already used hint for this checkpoint'); return; }
+  S.hintOverlayOpen = true;
+  const checkpoints = S.assignedRoute.stops.slice(1,-1);
+  const locId = checkpoints[S.cpIndex];
+  document.getElementById('hint-loc-name').textContent = LOCS[locId]||locId;
+  document.getElementById('hint-text-box').style.display='none';
+  document.getElementById('hint-reveal-btn-wrap').style.display='block';
+  document.getElementById('hint-text-content').textContent='';
+  document.getElementById('hint-locked').style.display='block';
+  document.getElementById('hint-unlocked').style.display='none';
+  document.getElementById('s-hint-overlay').style.display='block';
+  document.body.style.overflow='hidden';
+  // Reset needle
+  updateTempBar(S.tempPos, 'hint-needle', 'hint-temp-lbl', null);
+  const dist = distToCurrentCP();
+  checkHintUnlock(dist);
+}
+function closeHintOverlay() {
+  S.hintOverlayOpen = false;
+  document.getElementById('s-hint-overlay').style.display='none';
+  document.body.style.overflow='';
+}
+function revealHint() {
+  const checkpoints = S.assignedRoute.stops.slice(1,-1);
+  const locId = checkpoints[S.cpIndex];
+  S.penalty++; S.hintsUsed++; S.hintUsedForCurrent = true;
+  document.getElementById('hint-text-content').textContent = HINTS[locId]||'Look carefully for the landmark near the location.';
+  document.getElementById('hint-text-box').style.display='block';
+  document.getElementById('hint-reveal-btn-wrap').style.display='none';
+  fbUpdate('teams/'+S.teamId, {penalty: S.penalty, hintsUsed: S.hintsUsed}).catch(()=>{});
+}
+
+// ══════════════════════════════════════════════
+// VERIFY FLOW
+// ══════════════════════════════════════════════
+function openVerifyFlow() {
+  S.verifyOverlayOpen = true; S.verifyStep = 0;
+  const checkpoints = S.assignedRoute.stops.slice(1,-1);
+  const locId = checkpoints[S.cpIndex];
+  document.getElementById('verify-title').textContent = 'Verify Checkpoint '+(S.cpIndex+1);
+  document.getElementById('v-member-count').textContent = S.faceCount || S.members.length;
+  document.getElementById('s-verify-overlay').style.display='block';
+  document.body.style.overflow='hidden';
+  resetVerify();
+  // GPS pre-check
+  const dist = distToCurrentCP();
+  const gpsEl = document.getElementById('verify-gps-fail');
+  const camEl = document.getElementById('verify-cam-section');
+  const rad = RAD[locId] || 50;
+  if(dist !== Infinity && dist > rad * 2.5) {
+    gpsEl.style.display='block';
+    document.getElementById('verify-dist-msg').textContent = `You are ${Math.round(dist)}m away. Must be within ${rad}m of ${LOCS[locId]}.`;
+    if(camEl) camEl.style.display='none';
+  } else {
+    gpsEl.style.display='none';
+    if(camEl) camEl.style.display='block';
+  }
+}
+function closeVerifyOverlay() {
+  S.verifyOverlayOpen = false;
+  document.getElementById('s-verify-overlay').style.display='none';
+  document.body.style.overflow='';
+  stopStream(S.verifyCamStream); S.verifyCamStream = null;
+}
+function resetVerify() {
+  S.verifyStep = 0; S.capturedVerifyBlob = null;
+  setChk('v-gps-icon','w','•'); setChk('v-face-icon','w','•'); setChk('v-loc-icon','w','•');
+  document.getElementById('v-pass').style.display='none';
+  document.getElementById('v-fail').style.display='none';
+  document.getElementById('v-canvas').style.display='none';
+  document.getElementById('v-video').style.display='none';
+  document.getElementById('v-cam-overlay').style.display='flex';
+  document.getElementById('v-btn-area').innerHTML='<button class="btn" onclick="openVerifyCamera()">📷 Open Camera</button>';
+  stopStream(S.verifyCamStream); S.verifyCamStream = null;
+}
+function setChk(id, status, icon) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = 'chk-icon ci-'+status;
+  el.textContent = icon;
+}
+async function openVerifyCamera() {
+  if(S.verifyCamStream) {
+    // Take photo
+    const btnArea = document.getElementById('v-btn-area');
+    btnArea.innerHTML = '<button class="btn" disabled>⏳ Verifying...</button>';
+    const blob = await captureFrame('v-video','v-canvas');
+    stopStream(S.verifyCamStream); S.verifyCamStream = null;
+    S.capturedVerifyBlob = blob;
+    await runVerification(blob);
+    return;
+  }
+  S.verifyCamStream = await openCamera('v-video','v-cam-overlay','v-btn-area', () => {
+    document.getElementById('v-btn-area').innerHTML = '<button class="btn btn-gold" onclick="openVerifyCamera()">📸 Take Photo</button>';
+  });
+}
+
+async function runVerification(blob) {
+  const checkpoints = S.assignedRoute.stops.slice(1,-1);
+  const locId = checkpoints[S.cpIndex];
+  const rad = RAD[locId] || 50;
+  const dist = distToCurrentCP();
+  let gpsOk = false, faceOk = false;
+
+  // 1. GPS check
+  setChk('v-gps-icon','c','⟳');
+  document.getElementById('v-gps-sub').textContent='Checking GPS...';
+  await delay(700);
+  if(dist === Infinity) {
+    // GPS not available — warn but allow (for testing indoors)
+    gpsOk = true;
+    setChk('v-gps-icon','p','✓');
+    document.getElementById('v-gps-sub').textContent='GPS unavailable — accepted';
+  } else if(dist <= rad * 1.5) {
+    gpsOk = true;
+    setChk('v-gps-icon','p','✓');
+    document.getElementById('v-gps-sub').textContent=`Within range (${Math.round(dist)}m)`;
+  } else {
+    gpsOk = false;
+    setChk('v-gps-icon','f','✗');
+    document.getElementById('v-gps-sub').textContent=`Too far: ${Math.round(dist)}m (need <${rad}m)`;
+  }
+
+  // 2. Face / headcount check
+  setChk('v-face-icon','c','⟳');
+  document.getElementById('v-face-sub').textContent='Counting faces...';
+  await delay(300);
+  const detected = await countFaces(blob);
+  const expected = S.faceCount || S.members.length;
+  if(detected === -1) {
+    // Fallback — can't detect
+    faceOk = true;
+    setChk('v-face-icon','p','✓');
+    document.getElementById('v-face-sub').textContent='Face detection unavailable — accepted';
+  } else if(detected >= expected) {
+    faceOk = true;
+    setChk('v-face-icon','p','✓');
+    document.getElementById('v-face-sub').textContent=`${detected} face(s) detected ✓`;
+  } else {
+    faceOk = false;
+    setChk('v-face-icon','f','✗');
+    document.getElementById('v-face-sub').textContent=`Only ${detected} face(s) — need ${expected}. Whole team must be in photo!`;
+  }
+
+  // 3. Location confirmed (GPS + photo)
+  setChk('v-loc-icon','c','⟳');
+  document.getElementById('v-loc-sub').textContent='Confirming location...';
+  await delay(800);
+  setChk('v-loc-icon','p','✓');
+  document.getElementById('v-loc-sub').textContent='Location: ' + (LOCS[locId]||locId);
+
+  // RESULT
+  if(gpsOk && faceOk) {
+    document.getElementById('v-pass').style.display='block';
+    document.getElementById('v-pass-msg').textContent=`Checkpoint ${S.cpIndex+1} of ${checkpoints.length} complete!`;
+    // Upload photo to Firebase
+    if(S.teamId && blob) {
+      fbUpload('checkpoint-photos/'+S.teamId+'_cp'+(S.cpIndex+1)+'.jpg', blob).catch(()=>{});
+    }
+  } else {
+    document.getElementById('v-fail').style.display='block';
+    let msg = [];
+    if(!gpsOk) msg.push('GPS: you are too far from ' + (LOCS[locId]||locId));
+    if(!faceOk) msg.push('Team photo: not all members visible');
+    document.getElementById('v-fail-msg').textContent = msg.join(' · ');
+  }
+}
+
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function completeCheckpoint() {
+  closeVerifyOverlay();
+  S.hintUsedForCurrent = false;
+  S.tempPos = 8 + Math.random()*20;
+  const checkpoints = S.assignedRoute.stops.slice(1,-1);
+  await fbUpdate('teams/'+S.teamId, {cpIndex: S.cpIndex+1, elapsed: S.elapsed}).catch(()=>{});
+  if(S.cpIndex < checkpoints.length - 1) {
+    const nextLoc = checkpoints[S.cpIndex+1];
+    const nextRiddles = RIDDLES[nextLoc]||['Find this location on campus.'];
+    document.getElementById('cpd-title').textContent = 'Checkpoint '+(S.cpIndex+1)+' Done!';
+    document.getElementById('cpd-sub').textContent = (checkpoints.length - S.cpIndex - 1) + ' more to go!';
+    document.getElementById('cpd-next-clue').textContent = '"' + nextRiddles[0].substring(0,120) + '..."';
+    S.cpIndex++;
+    goto('s-cp-done');
+  } else {
+    // FINISH
+    clearInterval(S.timerInt);
+    const total = S.elapsed + S.penalty * 60;
+    await fbUpdate('teams/'+S.teamId, { status:'finished', elapsed:S.elapsed, penalty:S.penalty, total, finishedAt:window.FB.serverTimestamp() }).catch(()=>{});
+    document.getElementById('fin-team').textContent = S.teamName + ' · ' + S.assignedRoute.name;
+    document.getElementById('fin-time').textContent = fmt(S.elapsed);
+    document.getElementById('fin-pen').textContent = '+'+S.penalty+'m';
+    document.getElementById('fin-total').textContent = fmt(total);
+    goto('s-complete');
+  }
+}
+
+// ══════════════════════════════════════════════
+// LEADERBOARD
+// ══════════════════════════════════════════════
+let lbUnsub = null;
+function enterLeaderboard() {
+  if(lbUnsub) lbUnsub();
+  lbUnsub = fbListenCol('teams', teams => {
+    const finished = teams.filter(t=>t.status==='finished').sort((a,b)=>(a.total||99999)-(b.total||99999));
+    const active = teams.filter(t=>t.status==='active'||t.status==='started');
+    document.getElementById('lb-fin').textContent = finished.length;
+    document.getElementById('lb-act').textContent = active.length;
+    document.getElementById('lb-best').textContent = finished.length ? fmt(finished[0].total) : '—';
+    const fullList = document.getElementById('lb-full-list');
+    const myOnly = document.getElementById('lb-my-team-only');
+    const empty = document.getElementById('lb-empty');
+    if(S.isAdmin) {
+      if(myOnly) myOnly.style.display='none';
+      // Full list for admin
+      const all = [...finished,...active,...teams.filter(t=>t.status==='pending'||t.status==='waiting')];
+      if(all.length===0){ if(empty) empty.style.display='block'; if(fullList) fullList.innerHTML=''; return; }
+      if(empty) empty.style.display='none';
+      if(fullList) fullList.innerHTML = all.map((t,i)=>{
+        const rank=i+1;
+        const rc=rank===1?'rc1':rank===2?'rc2':rank===3?'rc3':'rcn';
+        const rowCls=rank===1?'lb-row r1':rank===2?'lb-row r2':rank===3?'lb-row r3':'lb-row';
+        const stBadge=t.status==='finished'?`<span class="badge b-green">Done</span>`:t.status==='active'||t.status==='started'?`<span class="badge b-amber">CP ${(t.cpIndex||0)+1}</span>`:`<span class="badge b-dim">Waiting</span>`;
+        const timeStr=t.status==='finished'?fmt(t.total):'—';
+        return`<div class="${rowCls}"><div class="rank-c ${rc}">${rank}</div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;font-family:'Syne',sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.teamName}</div><div style="font-size:12px;color:var(--muted)">${t.routeName||'—'} · ${(t.members||[]).length} members</div></div>${stBadge}<div style="font-size:15px;font-weight:800;font-family:'Syne',sans-serif;color:${t.status==='finished'?'var(--gold)':'var(--muted)'};min-width:50px;text-align:right">${timeStr}</div></div>`;
+      }).join('');
+    } else {
+      // Only show this team's position
+      if(fullList) fullList.innerHTML='';
+      if(!S.teamId){ if(empty) empty.style.display='block'; return; }
+      if(empty) empty.style.display='none';
+      const myRank = finished.findIndex(t=>t.teamId===S.teamId)+1;
+      if(myOnly) myOnly.style.display='block';
+      const myRankEl = document.getElementById('lb-my-rank');
+      const myTimeEl = document.getElementById('lb-my-time');
+      if(myRankEl) myRankEl.textContent = myRank > 0 ? '#'+myRank : '—';
+      if(myTimeEl) myTimeEl.textContent = myRank > 0 ? 'Time: '+fmt(finished[myRank-1].total) : 'Still hunting...';
+    }
+  });
+}
+
+// ══════════════════════════════════════════════
+// ADMIN
+// ══════════════════════════════════════════════
+function adminLogin() {
+  const pw = document.getElementById('adm-pw')?.value;
+  const err = document.getElementById('adm-err');
+  if(pw === ADMIN_PW) {
+    S.isAdmin = true;
+    if(err) err.style.display='none';
+    goto('s-admin');
+  } else {
+    if(err) err.style.display='block';
+    document.getElementById('adm-pw').value='';
+  }
+}
+let admUnsub = null;
+function enterAdmin() {
+  if(admUnsub) admUnsub();
+  admUnsub = fbListenCol('teams', teams => {
+    const pending = teams.filter(t=>t.status==='pending');
+    const active = teams.filter(t=>t.status==='active'||t.status==='started');
+    const done = teams.filter(t=>t.status==='finished');
+    document.getElementById('ad-total').textContent = teams.length;
+    document.getElementById('ad-pending').textContent = pending.length;
+    document.getElementById('ad-done').textContent = done.length;
+    // Update landing stat
+    const statEl = document.getElementById('stat-teams');
+    if(statEl) statEl.textContent = teams.length;
+
+    const pl = document.getElementById('adm-pending-list');
+    const al = document.getElementById('adm-active-list');
+    if(pl) pl.innerHTML = pending.length === 0 ? '<div style="color:var(--muted);font-size:13px;padding:8px 0">No pending teams</div>' :
+      pending.map(t=>`
+        <div class="adm-row">
+          <div class="dot dot-a"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;font-family:'Syne',sans-serif">${t.teamName}</div>
+            <div style="font-size:12px;color:var(--muted)">${t.routeName} · ${(t.members||[]).length} members · Leader: ${t.leaderName||'—'}</div>
+            ${t.teamPhotoUrl?`<img src="${t.teamPhotoUrl}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:8px">`:``}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-left:8px">
+            <button class="btn btn-sm btn-green" onclick="approveTeam('${t.teamId}')">✓ Approve</button>
+            <button class="btn btn-sm btn-red" onclick="rejectTeam('${t.teamId}')">✗ Reject</button>
+          </div>
+        </div>`).join('');
+    if(al) al.innerHTML = [...active,...done].length === 0 ? '<div style="color:var(--muted);font-size:13px;padding:8px 0">No active teams</div>' :
+      [...active,...done].sort((a,b)=>(a.total||99999)-(b.total||99999)).map(t=>`
+        <div class="adm-row">
+          <div class="dot ${t.status==='finished'?'dot-g':'dot-a'}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;font-family:'Syne',sans-serif">${t.teamName}</div>
+            <div style="font-size:12px;color:var(--muted)">${t.routeName} · CP ${(t.cpIndex||0)+1} · ${t.status==='finished'?'Done '+fmt(t.total||0):'Active '+fmt(t.elapsed||0)}</div>
+          </div>
+          <span class="badge ${t.status==='finished'?'b-green':'b-amber'}">${t.status==='finished'?'Finished':'Active'}</span>
+        </div>`).join('');
+  });
+}
+
+async function approveTeam(id) {
+  await fbUpdate('teams/'+id, { status:'active' });
+  toast('Team approved and started!');
+}
+async function rejectTeam(id) {
+  if(!confirm('Reject this team?')) return;
+  await fbUpdate('teams/'+id, { status:'rejected' });
+  toast('Team rejected');
+}
+async function adminStartAll() {
+  const snap = await window.FB.getDocs(window.FB.collection(window.DB,'teams'));
+  const batch = snap.docs.filter(d=>d.data().status==='pending');
+  await Promise.all(batch.map(d=>fbUpdate('teams/'+d.id,{status:'active'})));
+  toast('All pending teams approved and started!');
+}
+async function adminStopAll() {
+  if(!confirm('Stop the hunt for all teams?')) return;
+  const snap = await window.FB.getDocs(window.FB.collection(window.DB,'teams'));
+  await Promise.all(snap.docs.map(d=>fbUpdate('teams/'+d.id,{huntStopped:true})));
+  toast('Hunt stopped for all teams');
+}
+
+async function exportCSV() {
+  const snap = await window.FB.getDocs(window.FB.collection(window.DB,'teams'));
+  const teams = snap.docs.map(d=>d.data()).filter(t=>t.status==='finished').sort((a,b)=>(a.total||99999)-(b.total||99999));
+  if(!teams.length){ toast('No finished teams'); return; }
+  const lines=['Rank,Team,Leader,Route,Members,Hunt Time,Penalty,Total'];
+  teams.forEach((t,i)=>lines.push([i+1,t.teamName,t.leaderName||'—',t.routeName,(t.members||[]).length,fmt(t.elapsed||0),'+'+(t.penalty||0)+'m',fmt(t.total||0)].join(',')));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='hunt_results.csv'; a.click();
+}
+async function clearAllTeams() {
+  if(!confirm('Delete ALL team data from Firebase? This cannot be undone.')) return;
+  const snap = await window.FB.getDocs(window.FB.collection(window.DB,'teams'));
+  await Promise.all(snap.docs.map(d=>d.ref.delete?.() || fbUpdate('teams/'+d.id,{deleted:true})));
+  toast('All teams cleared');
+}
+
+// ══════════════════════════════════════════════
+// LIVE TEAM COUNT ON LANDING
+// ══════════════════════════════════════════════
+function listenTeamCount() {
+  fbListenCol('teams', teams => {
+    const el = document.getElementById('stat-teams');
+    if(el) el.textContent = teams.length;
+  });
+}
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+function init() {
+  document.getElementById('loader-msg').textContent = 'Loading face detection...';
+  loadFaceApi().then(() => {
+    document.getElementById('loader-msg').textContent = 'Ready!';
+    setTimeout(() => {
+      document.getElementById('loader').classList.add('hide');
+      setTimeout(() => { document.getElementById('loader').style.display='none'; }, 400);
+    }, 500);
+  }).catch(() => {
+    document.getElementById('loader').classList.add('hide');
+    setTimeout(() => { document.getElementById('loader').style.display='none'; }, 400);
+  });
+  // Input validation
+  ['r-team','r-leader'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+      const nb = document.getElementById('reg-next');
+      if(nb) nb.disabled = S.members.length < 1 || !document.getElementById('r-team')?.value?.trim() || !document.getElementById('r-leader')?.value?.trim();
+    });
+  });
+  listenTeamCount();
+  // Restore session
+  if(S.teamId) {
+    fbGet('teams/'+S.teamId).then(data => {
+      if(!data) return;
+      S.teamName = data.teamName||'';
+      S.leaderName = data.leaderName||'';
+      S.members = data.members||[];
+      S.faceCount = data.faceCount||0;
+      S.teamPhotoUrl = data.teamPhotoUrl||'';
+      S.cpIndex = data.cpIndex||0;
+      S.elapsed = data.elapsed||0;
+      S.penalty = data.penalty||0;
+      const route = ROUTES.find(r=>r.name===data.routeName);
+      if(route) S.assignedRoute = route;
+    }).catch(()=>{});
+  }
+}
+
+if(window.firebaseReady) init();
+else window.addEventListener('firebase-ready', init);
+</script>
+</body>
+</html>
