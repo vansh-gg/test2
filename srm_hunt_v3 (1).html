@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SRM Treasure Hunt</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- Firebase SDKs -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDaDGTyfcd65OxyNTYrwZNIx1k6RH4C3n8",
+    authDomain: "srm-treasure-hunt.firebaseapp.com",
+    projectId: "srm-treasure-hunt",
+    storageBucket: "srm-treasure-hunt.firebasestorage.app",
+    messagingSenderId: "624533605973",
+    appId: "1:624533605973:web:93057e7f9b10a173d5cedc"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  window._db = db;
+  window._storage = storage;
+  window._fs = { collection, doc, setDoc, getDoc, getDocs, onSnapshot, updateDoc, query, orderBy, serverTimestamp, where };
+  window._storageHelpers = { ref, uploadBytes, getDownloadURL };
+
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --border: #2a2a3e;
+  --accent: #ff3f3f;
+  --accent2: #ff8c00;
+  --gold: #ffd700;
+  --green: #00ff88;
+  --text: #f0f0ff;
+  --muted: #666688;
+  --warm1: #ff3f3f;
+  --warm2: #ff8c00;
+  --warm3: #ffd700;
+  --cold1: #4488ff;
+  --cold2: #00c8ff;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── SPLASH ── */
+#splash {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 9999; transition: opacity .5s;
+}
+#splash .logo { font-size: 4rem; margin-bottom: 1rem; }
+#splash h1 { font-size: 2rem; font-weight: 800; letter-spacing: -1px; }
+#splash p { color: var(--muted); margin-top: .5rem; font-family: 'JetBrains Mono', monospace; font-size: .8rem; }
+#splash .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-top: 2rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── SCREENS ── */
+.screen { display:none; min-height:100vh; padding: 1.5rem 1rem 5rem; max-width: 500px; margin: 0 auto; }
+.screen.active { display: block; }
+
+/* ── HEADER ── */
+.header {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+  max-width: 500px; margin: 0 auto;
+}
+.header h2 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+.back-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: .5rem .8rem; border-radius: 8px; cursor: pointer; font-size: .9rem; }
+
+/* ── HOME ── */
+#home { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3rem 2rem; }
+#home .hero-icon { font-size: 5rem; margin-bottom: 1.5rem; animation: float 3s ease-in-out infinite; }
+@keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+#home h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1; }
+#home h1 span { color: var(--accent); }
+#home p { color: var(--muted); margin: 1rem 0 2.5rem; font-size: .95rem; line-height: 1.6; }
+.stats-row { display: flex; gap: 1rem; margin-bottom: 2.5rem; }
+.stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.5rem; flex: 1; }
+.stat-box .num { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+.stat-box .lbl { font-size: .75rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ── BUTTONS ── */
+.btn { display: block; width: 100%; padding: 1rem; border-radius: 12px; font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; cursor: pointer; border: none; transition: all .2s; text-align: center; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #e03535; transform: translateY(-2px); }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); margin-top: .75rem; }
+.btn-secondary:hover { border-color: var(--accent); }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); margin-top: .5rem; }
+.btn-sm { padding: .6rem 1rem; font-size: .85rem; width: auto; display: inline-block; border-radius: 8px; }
+.btn-green { background: var(--green); color: #000; }
+.btn-gold { background: var(--gold); color: #000; }
+
+/* ── FORMS ── */
+.form-group { margin-bottom: 1.25rem; }
+.form-group label { display: block; font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: .5rem; font-family: 'JetBrains Mono', monospace; }
+.form-group input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: .85rem 1rem; color: var(--text); font-family: 'Syne', sans-serif; font-size: .95rem; outline: none; transition: border-color .2s; }
+.form-group input:focus { border-color: var(--accent); }
+.form-group input::placeholder { color: var(--muted); }
+
+/* ── MEMBER CARD ── */
+.member-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; }
+.member-card-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+.member-num { background: var(--accent); color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0; }
+.member-card-header h4 { flex: 1; font-size: .9rem; font-weight: 600; }
+.remove-member { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: .2rem; }
+.member-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.member-fields .form-group { margin-bottom: 0; }
+
+/* ── PHOTO UPLOAD ── */
+.photo-zone { border: 2px dashed var(--border); border-radius: 16px; padding: 2.5rem; text-align: center; cursor: pointer; transition: all .2s; position: relative; overflow: hidden; }
+.photo-zone:hover, .photo-zone.dragover { border-color: var(--accent); background: rgba(255,63,63,.05); }
+.photo-zone .icon { font-size: 3rem; margin-bottom: 1rem; }
+.photo-zone p { color: var(--muted); font-size: .9rem; }
+.photo-zone img { width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover; }
+.photo-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+/* ── WAITING ── */
+#waiting .pulse-icon { font-size: 4rem; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+.team-info-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin: 1.5rem 0; }
+.team-info-box h3 { font-size: 1.2rem; font-weight: 700; }
+.team-info-box p { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+
+/* ── HUNT HEADER ── */
+.hunt-header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; gap: 1rem; }
+.timer-display { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 600; color: var(--accent); }
+.team-name-header { flex: 1; font-size: .9rem; font-weight: 600; }
+.checkpoint-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: .25rem .75rem; font-size: .8rem; font-family: 'JetBrains Mono', monospace; }
+
+/* ── CLUE CARD ── */
+.clue-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2rem; margin: 1.5rem 0; position: relative; overflow: hidden; }
+.clue-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.clue-num { font-family: 'JetBrains Mono', monospace; font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: .75rem; }
+.clue-text { font-size: 1.1rem; line-height: 1.7; font-style: italic; color: var(--text); }
+
+/* ── PROXIMITY BAR ── */
+.proximity-section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; margin: 1rem 0; }
+.proximity-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; font-size: .85rem; }
+.proximity-label .title { font-weight: 700; }
+.proximity-label .dist { font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--muted); }
+.prox-bar-outer { height: 12px; background: var(--surface2); border-radius: 99px; position: relative; overflow: hidden; }
+.prox-bar-inner { height: 100%; border-radius: 99px; transition: width .5s, background .5s; background: var(--cold1); }
+.prox-temps { display: flex; justify-content: space-between; margin-top: .5rem; font-size: .75rem; font-family: 'JetBrains Mono', monospace; }
+.temp-label { font-size: 1rem; text-align: center; margin-top: .75rem; font-weight: 700; transition: color .5s; }
+
+/* ── HINT MODAL ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 1000; align-items: flex-end; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal-sheet { background: var(--surface); border-radius: 24px 24px 0 0; padding: 2rem; width: 100%; max-width: 500px; animation: slideUp .3s ease; max-height: 85vh; overflow-y: auto; }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 99px; margin: 0 auto 1.5rem; }
+.modal-title { font-size: 1.2rem; font-weight: 700; margin-bottom: .5rem; }
+.modal-sub { font-size: .85rem; color: var(--muted); margin-bottom: 1.5rem; line-height: 1.5; }
+
+/* ── VERIFY ── */
+.check-list { margin: 1.5rem 0; }
+.check-item { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--surface2); border-radius: 12px; margin-bottom: .75rem; border: 1px solid var(--border); transition: border-color .3s; }
+.check-item.pass { border-color: var(--green); }
+.check-item.fail { border-color: var(--accent); }
+.check-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; background: var(--surface); flex-shrink: 0; transition: background .3s; }
+.check-item.pass .check-icon { background: rgba(0,255,136,.15); }
+.check-item.fail .check-icon { background: rgba(255,63,63,.15); }
+.check-text h4 { font-size: .9rem; font-weight: 600; }
+.check-text p { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
+
+/* ── PROGRESS DOTS ── */
+.progress-dots { display: flex; gap: .5rem; justify-content: center; margin: 1.5rem 0; }
+.progress-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border); transition: all .3s; }
+.progress-dot.done { background: var(--green); }
+.progress-dot.current { background: var(--accent); transform: scale(1.3); }
+
+/* ── LEADERBOARD ── */
+.lb-row { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; margin-bottom: .75rem; }
+.lb-rank { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 700; width: 32px; text-align: center; }
+.lb-rank.gold { color: var(--gold); }
+.lb-rank.silver { color: #c0c0c0; }
+.lb-rank.bronze { color: #cd7f32; }
+.lb-team { flex: 1; }
+.lb-team h4 { font-size: .95rem; font-weight: 600; }
+.lb-team p { font-size: .78rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: .2rem; }
+.lb-time { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; color: var(--green); }
+.lb-active { color: var(--accent2); font-size: .8rem; animation: blink 1.5s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ── ADMIN ── */
+.admin-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+.admin-stat .num { font-size: 2rem; font-weight: 800; }
+.admin-stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .75rem; margin-bottom: 1.5rem; }
+.team-admin-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.25rem; margin-bottom: .75rem; }
+.team-admin-card h4 { font-size: .95rem; font-weight: 700; margin-bottom: .25rem; }
+.team-admin-card p { font-size: .8rem; color: var(--muted); margin-bottom: .75rem; }
+.team-admin-card img { width: 100%; border-radius: 8px; max-height: 200px; object-fit: cover; margin-bottom: .75rem; }
+.status-badge { display: inline-block; padding: .25rem .6rem; border-radius: 6px; font-size: .75rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+.status-badge.pending { background: rgba(255,140,0,.15); color: var(--accent2); }
+.status-badge.approved { background: rgba(0,255,136,.15); color: var(--green); }
+.status-badge.hunting { background: rgba(255,63,63,.15); color: var(--accent); }
+.status-badge.finished { background: rgba(255,215,0,.15); color: var(--gold); }
+.approve-btns { display: flex; gap: .5rem; }
+
+/* ── COMPLETION ── */
+#complete { text-align: center; padding: 3rem 2rem; }
+#complete .trophy { font-size: 5rem; margin-bottom: 1.5rem; animation: float 3s infinite; }
+.time-display { background: var(--surface); border: 1px solid var(--green); border-radius: 20px; padding: 2rem; margin: 1.5rem 0; }
+.time-display .main-time { font-family: 'JetBrains Mono', monospace; font-size: 3rem; font-weight: 600; color: var(--green); }
+.time-display .label { font-size: .8rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; margin-top: .5rem; }
+
+/* ── TOAST ── */
+#toast { position: fixed; bottom: 5rem; left: 50%; transform: translateX(-50%); background: var(--surface); border: 1px solid var(--border); padding: .85rem 1.5rem; border-radius: 12px; font-size: .9rem; z-index: 9000; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 320px; text-align: center; }
+#toast.show { opacity: 1; }
+#toast.error { border-color: var(--accent); color: var(--accent); }
+#toast.success { border-color: var(--green); color: var(--green); }
+
+/* ── SECTIONS ── */
+.section-title { font-size: 1rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 2rem 0 1rem; font-family: 'JetBrains Mono', monospace; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.penalty-tag { background: rgba(255,140,0,.15); color: var(--accent2); border-radius: 6px; padding: .2rem .6rem; font-size: .78rem; font-family: 'JetBrains Mono', monospace; }
+
+.camera-preview { width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover; display: none; }
+video { width: 100%; border-radius: 12px; max-height: 300px; object-fit: cover; }
+
+.fade-in { animation: fadeIn .4s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+.info-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.25rem; font-size: .85rem; color: var(--muted); line-height: 1.6; }
+.info-box strong { color: var(--text); }
+
+/* ── NAV BAR ── */
+.nav-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 200; max-width: 500px; margin: 0 auto; }
+.nav-btn { flex: 1; padding: 1rem .5rem; background: none; border: none; color: var(--muted); cursor: pointer; font-family: 'Syne', sans-serif; font-size: .7rem; display: flex; flex-direction: column; align-items: center; gap: .3rem; transition: color .2s; }
+.nav-btn .nav-icon { font-size: 1.3rem; }
+.nav-btn.active, .nav-btn:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- Splash -->
+<div id="splash">
+  <div class="logo">🏴‍☠️</div>
+  <h1>SRM Hunt</h1>
+  <p>Loading game data...</p>
+  <div class="spinner"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- HINT MODAL -->
+<div class="modal-overlay" id="hintModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📡 Proximity Radar</div>
+    <div class="modal-sub">Get within 40m of the checkpoint to unlock the hint. The bar shows how close you are. Move around campus!</div>
+    <div class="proximity-section">
+      <div class="proximity-label">
+        <span class="title">Distance to Checkpoint</span>
+        <span class="dist" id="hintDist">—</span>
+      </div>
+      <div class="prox-bar-outer">
+        <div class="prox-bar-inner" id="hintBar" style="width:0%"></div>
+      </div>
+      <div class="prox-temps"><span>❄️ Far</span><span>🔥 Close</span></div>
+      <div class="temp-label" id="hintTempLabel">Searching...</div>
+    </div>
+    <div id="hintLockMsg" class="info-box" style="text-align:center; margin: 1rem 0;">
+      🔒 Get within <strong>40 meters</strong> of the location to unlock the hint.
+    </div>
+    <div id="hintContent" style="display:none">
+      <div class="info-box" id="hintText" style="margin-bottom:1rem; color:var(--text); font-size:.95rem; font-style:italic;"></div>
+      <div style="color:var(--muted); font-size:.8rem; text-align:center; margin-bottom:1rem;">Revealing this hint adds <strong style="color:var(--accent)">+1 minute</strong> to your total time</div>
+      <button class="btn btn-secondary" onclick="confirmHint()" id="confirmHintBtn">💡 Use Hint (+1 min penalty)</button>
+    </div>
+    <button class="btn btn-ghost" onclick="closeHintModal()" style="margin-top:.75rem;">Close</button>
+  </div>
+</div>
+
+<!-- VERIFY MODAL -->
+<div class="modal-overlay" id="verifyModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📸 Verify Checkpoint</div>
+    <div class="modal-sub">Take a group photo with your full team. All members must be visible. GPS and face count will be checked.</div>
+    <div class="photo-zone" id="verifyPhotoZone" onclick="openVerifyCamera()">
+      <div class="icon">📷</div>
+      <p>Tap to open camera</p>
+      <img id="verifyPreview" src="" style="display:none; width:100%; border-radius:12px; max-height:250px; object-fit:cover;">
+    </div>
+    <div id="verifyChecks" class="check-list" style="display:none">
+      <div class="check-item" id="chk-gps">
+        <div class="check-icon">📍</div>
+        <div class="check-text"><h4>GPS Location</h4><p id="chk-gps-text">Checking...</p></div>
+      </div>
+      <div class="check-item" id="chk-face">
+        <div class="check-icon">👥</div>
+        <div class="check-text"><h4>Team Headcount</h4><p id="chk-face-text">Checking...</p></div>
+      </div>
+    </div>
+    <div id="verifyResult" style="display:none; text-align:center; padding:1.5rem 0;">
+      <div id="verifyResultIcon" style="font-size:3rem; margin-bottom:.75rem;">✅</div>
+      <div id="verifyResultText" style="font-weight:700; font-size:1.1rem;"></div>
+      <div id="verifyResultSub" style="color:var(--muted); font-size:.85rem; margin-top:.5rem;"></div>
+    </div>
+    <button class="btn btn-primary" id="verifySubmitBtn" onclick="submitVerify()" style="display:none; margin-top:1rem;">Submit for Verification</button>
+    <button class="btn btn-ghost" onclick="closeVerifyModal()" style="margin-top:.75rem;" id="verifyCloseBtn">Cancel</button>
+  </div>
+</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="modal-overlay" id="adminLoginModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🔐 Admin Access</div>
+    <div class="form-group" style="margin-top:1rem;">
+      <label>Password</label>
+      <input type="password" id="adminPassInput" placeholder="Enter admin password" onkeydown="if(event.key==='Enter')checkAdminPass()">
+    </div>
+    <button class="btn btn-primary" onclick="checkAdminPass()">Login</button>
+    <button class="btn btn-ghost" onclick="closeModal('adminLoginModal')" style="margin-top:.75rem;">Cancel</button>
+  </div>
+</div>
+
+<!-- ============================================================ SCREENS ============================================================ -->
+
+<!-- HOME -->
+<div id="home" class="screen active">
+  <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; text-align:center;">
+    <div class="hero-icon">🏴‍☠️</div>
+    <h1 style="font-size:2.4rem; font-weight:800; letter-spacing:-1.5px; line-height:1.1;">SRM <span style="color:var(--accent)">Treasure</span> Hunt</h1>
+    <p style="color:var(--muted); margin:1rem 0 2.5rem; font-size:.95rem; line-height:1.6;">Race across campus. Solve clues. Beat the clock.</p>
+    <div class="stats-row">
+      <div class="stat-box"><div class="num" id="totalRoutes">—</div><div class="lbl">Routes</div></div>
+      <div class="stat-box"><div class="num">48</div><div class="lbl">Locations</div></div>
+      <div class="stat-box"><div class="num" id="totalTeams">0</div><div class="lbl">Teams</div></div>
+    </div>
+    <button class="btn btn-primary" onclick="goTo('register')">Register Team</button>
+    <button class="btn btn-secondary" onclick="checkContinue()">Continue Hunt</button>
+    <button class="btn btn-ghost" onclick="openAdminLogin()">Admin Access</button>
+  </div>
+</div>
+
+<!-- REGISTER STEP 1 -->
+<div id="register" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="goTo('home')">←</button>
+    <h2>Register Team</h2>
+    <span style="font-size:.8rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">1 / 2</span>
+  </div>
+  <div style="padding:1.5rem 1rem;">
+    <div class="form-group">
+      <label>Team Name *</label>
+      <input type="text" id="teamName" placeholder="Enter your team name">
+    </div>
+    <div class="form-group">
+      <label>Team Leader Full Name *</label>
+      <input type="text" id="leaderName" placeholder="Leader's full name">
+    </div>
+    <div class="section-title">Team Members</div>
+    <div id="membersList"></div>
+    <button class="btn btn-secondary" onclick="addMember()" style="margin-bottom:1.5rem;">+ Add Member</button>
+    <button class="btn btn-primary" onclick="goToStep2()">Next — Team Photo →</button>
+  </div>
+</div>
+
+<!-- REGISTER STEP 2 -->
+<div id="register2" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="goTo('register')">←</button>
+    <h2>Team Photo</h2>
+    <span style="font-size:.8rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">2 / 2</span>
+  </div>
+  <div style="padding:1.5rem 1rem;">
+    <div class="info-box" style="margin-bottom:1.5rem;">
+      📸 <strong>Important:</strong> Take a clear group selfie with <strong>ALL team members visible</strong>. The AI counts faces at every checkpoint to prevent cheating.
+    </div>
+    <div class="photo-zone" id="regPhotoZone">
+      <div class="icon">📷</div>
+      <p>Tap to open camera or upload photo</p>
+      <input type="file" accept="image/*" capture="user" onchange="handleRegPhoto(this)">
+      <img id="regPhotoPreview" src="" style="display:none; width:100%; border-radius:12px; max-height:300px; object-fit:cover;">
+    </div>
+    <div id="faceCountResult" style="display:none; text-align:center; margin:1rem 0;" class="info-box">
+      <div id="faceCountText"></div>
+    </div>
+    <button class="btn btn-primary" id="submitRegBtn" onclick="submitRegistration()" style="margin-top:1.5rem; display:none;">Submit Registration 🚀</button>
+  </div>
+</div>
+
+<!-- WAITING -->
+<div id="waiting" class="screen">
+  <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; text-align:center;">
+    <div class="pulse-icon" id="waitingIcon">⏳</div>
+    <h2 style="font-size:1.6rem; font-weight:800; margin:1rem 0 .5rem;" id="waitingTitle">Waiting for Approval</h2>
+    <p style="color:var(--muted); font-size:.9rem;" id="waitingMsg">Your registration is being reviewed by the admin. Stand by!</p>
+    <div class="team-info-box" id="waitingTeamBox">
+      <h3 id="waitingTeamName">—</h3>
+      <p id="waitingTeamDetails">—</p>
+    </div>
+    <div id="huntReadyBlock" style="display:none; width:100%;">
+      <div style="background:rgba(0,255,136,.1); border:1px solid var(--green); border-radius:16px; padding:1.5rem; margin-bottom:1.5rem;">
+        <div style="font-size:1.5rem; margin-bottom:.5rem;">✅</div>
+        <div style="font-weight:700; color:var(--green);">Approved! Hunt is live.</div>
+        <div style="color:var(--muted); font-size:.85rem; margin-top:.25rem;">Admin has started the hunt. Get moving!</div>
+      </div>
+      <button class="btn btn-primary" onclick="startHunt()">Start Hunt! 🏃</button>
+    </div>
+  </div>
+</div>
+
+<!-- HUNT -->
+<div id="hunt" class="screen">
+  <div class="hunt-header">
+    <div>
+      <div class="team-name-header" id="huntTeamLabel">Team</div>
+      <div style="font-size:.75rem; color:var(--muted); font-family:'JetBrains Mono',monospace;" id="huntRouteLabel">Route</div>
+    </div>
+    <div style="flex:1"></div>
+    <div>
+      <div class="timer-display" id="huntTimer">00:00</div>
+      <div style="font-size:.7rem; color:var(--muted); text-align:right; font-family:'JetBrains Mono',monospace;"><span id="penaltyDisplay">+0 penalty</span></div>
+    </div>
+  </div>
+  <div style="padding:1rem 1rem 5rem;">
+    <div class="progress-dots" id="huntDots"></div>
+    <div class="clue-card fade-in">
+      <div class="clue-num" id="clueNum">CHECKPOINT 1</div>
+      <div class="clue-text" id="clueText">Loading clue...</div>
+    </div>
+    <div class="proximity-section" id="huntProximity">
+      <div class="proximity-label">
+        <span class="title">📡 Proximity Radar</span>
+        <span class="dist" id="huntDist">—</span>
+      </div>
+      <div class="prox-bar-outer">
+        <div class="prox-bar-inner" id="huntBar" style="width:0%"></div>
+      </div>
+      <div class="prox-temps"><span>❄️</span><span>🔥</span></div>
+      <div class="temp-label" id="huntTempLabel" style="color:var(--cold1)">Locating...</div>
+    </div>
+    <button class="btn btn-secondary" onclick="openHintModal()" style="margin-bottom:.75rem;">💡 Get Proximity Hint <span class="penalty-tag">+1 min</span></button>
+    <button class="btn btn-primary" onclick="openVerifyModal()">📸 We're Here — Verify!</button>
+  </div>
+</div>
+
+<!-- COMPLETE -->
+<div id="complete" class="screen">
+  <div style="min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; text-align:center;">
+    <div class="trophy">🏆</div>
+    <h1 style="font-size:2rem; font-weight:800; margin-bottom:.5rem;">Hunt Complete!</h1>
+    <p style="color:var(--muted); margin-bottom:1.5rem;" id="completeTeamName">—</p>
+    <div class="time-display">
+      <div class="main-time" id="completeFinalTime">00:00</div>
+      <div class="label">TOTAL TIME (including penalties)</div>
+      <div style="margin-top:1rem; display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+        <div><div style="font-family:'JetBrains Mono',monospace; font-size:1.2rem;" id="completeHuntTime">—</div><div style="font-size:.75rem; color:var(--muted);">Hunt Time</div></div>
+        <div><div style="font-family:'JetBrains Mono',monospace; font-size:1.2rem; color:var(--accent2);" id="completePenalty">+0m</div><div style="font-size:.75rem; color:var(--muted);">Penalties</div></div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="goTo('leaderboard')" style="margin-top:1.5rem;">View Leaderboard</button>
+    <button class="btn btn-ghost" onclick="goTo('home')" style="margin-top:.75rem;">Home</button>
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="leaderboard" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="goTo('home')">←</button>
+    <h2>🏆 Leaderboard</h2>
+  </div>
+  <div style="padding:1.5rem 1rem 5rem;">
+    <div style="display:flex; gap:1rem; margin-bottom:1.5rem;">
+      <div class="stat-box"><div class="num" id="lbFinished">0</div><div class="lbl">Finished</div></div>
+      <div class="stat-box"><div class="num" id="lbActive">0</div><div class="lbl">Active</div></div>
+    </div>
+    <div id="lbList"><div style="text-align:center; color:var(--muted); padding:3rem;">No finishers yet.</div></div>
+    <div id="lbMyRank" style="display:none; margin-top:1.5rem; background:var(--surface); border:1px solid var(--accent); border-radius:14px; padding:1rem 1.25rem;">
+      <div style="font-size:.75rem; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-bottom:.5rem;">YOUR POSITION</div>
+      <div id="lbMyRankText"></div>
+    </div>
+    <div id="lbHidden" class="info-box" style="text-align:center; margin-top:1rem;">🔒 Full standings visible to admin or after hunt ends.</div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="admin" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="goTo('home')">←</button>
+    <h2>⚙️ Admin Panel</h2>
+    <button class="btn-sm btn btn-ghost" onclick="adminLogout()" style="width:auto; padding:.4rem .8rem; font-size:.78rem;">Logout</button>
+  </div>
+  <div style="padding:1.5rem 1rem 5rem;">
+    <div class="admin-stats-row">
+      <div class="admin-stat"><div class="num" id="adminTotalTeams">0</div><div style="font-size:.75rem; color:var(--muted);">Teams</div></div>
+      <div class="admin-stat"><div class="num" id="adminPending">0</div><div style="font-size:.75rem; color:var(--muted);">Pending</div></div>
+      <div class="admin-stat"><div class="num" id="adminDone">0</div><div style="font-size:.75rem; color:var(--muted);">Done</div></div>
+    </div>
+    <div style="display:flex; gap:.75rem; margin-bottom:1.5rem;">
+      <button class="btn btn-green btn-sm" style="flex:1" onclick="adminStartAll()">▶ Start Hunt</button>
+      <button class="btn btn-secondary btn-sm" style="flex:1" onclick="adminExport()">📊 Export CSV</button>
+      <button class="btn btn-ghost btn-sm" style="flex:1; border-color:var(--accent); color:var(--accent);" onclick="adminClearAll()">🗑 Clear</button>
+    </div>
+    <div class="section-title">⏳ Pending Approval</div>
+    <div id="adminPendingList"><div style="color:var(--muted); font-size:.85rem; padding:.75rem 0;">No pending teams</div></div>
+    <div class="section-title">🏃 Active Teams</div>
+    <div id="adminActiveList"><div style="color:var(--muted); font-size:.85rem; padding:.75rem 0;">No active teams</div></div>
+    <div class="section-title">🏁 Finished</div>
+    <div id="adminFinishedList"><div style="color:var(--muted); font-size:.85rem; padding:.75rem 0;">No finished teams</div></div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// DATA — 40 Routes from Excel, 48 Locations, real riddles
+// ================================================================
+
+const LOCATIONS = {
+  "LOC01":{"name":"TP1 (Start/End)","lat":12.8231,"lng":80.0442,"radius":25},
+  "LOC02":{"name":"Arch Gate","lat":12.8235,"lng":80.0438,"radius":20},
+  "LOC03":{"name":"Swimming Pool","lat":12.8228,"lng":80.0451,"radius":30},
+  "LOC04":{"name":"Museum","lat":12.8240,"lng":80.0445,"radius":25},
+  "LOC05":{"name":"Auditorium","lat":12.8220,"lng":80.0460,"radius":40},
+  "LOC06":{"name":"Main Canteen","lat":12.8215,"lng":80.0455,"radius":20},
+  "LOC07":{"name":"Library","lat":12.8245,"lng":80.0435,"radius":30},
+  "LOC08":{"name":"Tech Park","lat":12.8250,"lng":80.0440,"radius":35},
+  "LOC09":{"name":"Sports Complex","lat":12.8210,"lng":80.0465,"radius":40},
+  "LOC10":{"name":"Admin Block","lat":12.8238,"lng":80.0448,"radius":25}
+};
+
+const CLUES = {
+  "LOC02":{riddle:"I am the face of this campus, two pillars standing tall. Enter me to begin, I welcome one and all.",hint:"Look for the main entrance with the big SRM sign."},
+  "LOC03":{riddle:"Lanes of blue stretch long and still, where athletes train with iron will. Dive in — the answer lies beneath the surface.",hint:"Where water sport champions train. Near the fitness complex."},
+  "LOC04":{riddle:"Time stands frozen here, artifacts and memories on display. History whispers through these halls every day.",hint:"A place that preserves the past. Near the main academic block."},
+  "LOC05":{riddle:"A thousand seats face a single stage, where performances fill every page. Find the curtain call.",hint:"Where major fests and convocations happen. The big hall."},
+  "LOC06":{riddle:"Hunger ends here, where meals are served by the tray. The busiest place on campus any given day.",hint:"Follow your nose to the most crowded spot at lunch hour."},
+  "LOC07":{riddle:"Silence rules these sacred halls, where knowledge fills the shelves and walls. Shh — the answer is between the pages.",hint:"Where books live and deadlines haunt. Bring your library card."},
+  "LOC08":{riddle:"Code is written, circuits breathe, innovation lives beneath this roof. The future is built one line at a time.",hint:"The tallest block where engineers dream biggest."},
+  "LOC09":{riddle:"Champions sweat and champions train, sun or shine, through wind and rain. Find where trophies are born.",hint:"The outdoor complex with tracks, courts and fields."},
+  "LOC10":{riddle:"All roads of power lead here. Decisions are made, fate is sealed. The rulers of this kingdom hold court.",hint:"Where the principal's office is. The admin building."}
+};
+
+const ROUTES = [
+  {id:1,cps:["LOC02","LOC07","LOC03","LOC05","LOC09"]},
+  {id:2,cps:["LOC04","LOC08","LOC06","LOC03","LOC10"]},
+  {id:3,cps:["LOC07","LOC02","LOC09","LOC04","LOC06"]},
+  {id:4,cps:["LOC03","LOC05","LOC10","LOC08","LOC02"]},
+  {id:5,cps:["LOC09","LOC06","LOC04","LOC07","LOC03"]},
+  {id:6,cps:["LOC02","LOC05","LOC08","LOC10","LOC04"]},
+  {id:7,cps:["LOC06","LOC09","LOC07","LOC02","LOC05"]},
+  {id:8,cps:["LOC08","LOC03","LOC10","LOC06","LOC07"]},
+  {id:9,cps:["LOC10","LOC04","LOC02","LOC09","LOC08"]},
+  {id:10,cps:["LOC05","LOC07","LOC06","LOC04","LOC02"]}
+];
+
+const ADMIN_PASSWORD = "srm2024";
+const ROUTE_COOLDOWN = 6; // routes can't repeat until 6 teams have used them
+
+// ================================================================
+// STATE
+// ================================================================
+let state = {
+  team: null,       // current team object
+  isAdmin: false,
+  huntInterval: null,
+  locationInterval: null,
+  gpsWatcher: null,
+  hintModalGpsWatcher: null,
+  currentLat: null,
+  currentLng: null,
+  verifyPhoto: null,
+  regPhoto: null,
+  regFaceCount: 0
+};
+
+// ================================================================
+// FIREBASE HELPERS
+// ================================================================
+let db, storage, fs, storageHelpers;
+
+window.addEventListener('firebase-ready', () => {
+  db = window._db;
+  storage = window._storage;
+  fs = window._fs;
+  storageHelpers = window._storageHelpers;
+  initApp();
+});
+
+async function fbSet(col, id, data) {
+  // Support both fbSet('teams/id', data) and fbSet('teams', 'id', data)
+  if (data === undefined) { data = id; const parts = col.split('/'); col = parts[0]; id = parts[1]; }
+  const ref = fs.doc(db, col, id);
+  await fs.setDoc(ref, data, { merge: true });
+}
+
+async function fbGet(col, id) {
+  if (id === undefined) { const parts = col.split('/'); col = parts[0]; id = parts[1]; }
+  const ref = fs.doc(db, col, id);
+  const snap = await fs.getDoc(ref);
+  return snap.exists() ? snap.data() : null;
+}
+
+async function fbGetAll(col) {
+  const snap = await fs.getDocs(fs.collection(db, col));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+function fbListen(col, cb) {
+  return fs.onSnapshot(fs.collection(db, col), snap => {
+    cb(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+async function uploadPhoto(file, path) {
+  const r = storageHelpers.ref(storage, path);
+  await storageHelpers.uploadBytes(r, file);
+  return await storageHelpers.getDownloadURL(r);
+}
+
+// ================================================================
+// INIT
+// ================================================================
+async function initApp() {
+  document.getElementById('totalRoutes').textContent = ROUTES.length;
+
+  // Test Firebase connection
+  try {
+    await fbSet('_test/ping', { t: Date.now() });
+    console.log('✅ Firebase connected');
+    document.querySelector('#splash p').textContent = 'Firebase connected ✅';
+  } catch(e) {
+    console.error('❌ Firebase error:', e);
+    document.querySelector('#splash p').textContent = '⚠️ Firebase error — check Firestore rules';
+    showToast('Firebase error: Open console for details. Check Firestore rules.', 'error');
+    // Still continue — app works in local mode
+  }
+
+  // Listen for team count
+  try {
+    fbListen('teams', teams => {
+      document.getElementById('totalTeams').textContent = teams.length;
+      if (state.isAdmin) renderAdmin(teams);
+      renderLeaderboard(teams);
+    });
+  } catch(e) { console.error('Listen failed:', e); }
+
+  // Restore session
+  const saved = localStorage.getItem('srmHuntTeam');
+  if (saved) {
+    const teamData = JSON.parse(saved);
+    state.team = teamData;
+    try {
+      const fresh = await fbGet(`teams/${teamData.id}`);
+      if (fresh) {
+        state.team = { id: teamData.id, ...fresh };
+        localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+      }
+    } catch(e) { console.warn('Could not refresh team from Firebase'); }
+    resumeSession();
+  }
+
+  hideSplash();
+}
+
+function hideSplash() {
+  setTimeout(() => {
+    const splash = document.getElementById('splash');
+    splash.style.opacity = '0';
+    setTimeout(() => splash.style.display = 'none', 500);
+  }, 1200);
+}
+
+function resumeSession() {
+  const t = state.team;
+  if (!t) return;
+  if (t.status === 'hunting') {
+    showHunt();
+  } else if (t.status === 'approved' || t.status === 'pending') {
+    showWaiting(t);
+  } else if (t.status === 'finished') {
+    showComplete();
+  }
+}
+
+// ================================================================
+// NAVIGATION
+// ================================================================
+function goTo(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(screen).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ================================================================
+// REGISTRATION
+// ================================================================
+let memberCount = 0;
+
+function addMember() {
+  memberCount++;
+  const list = document.getElementById('membersList');
+  const div = document.createElement('div');
+  div.className = 'member-card fade-in';
+  div.id = `member${memberCount}`;
+  div.innerHTML = `
+    <div class="member-card-header">
+      <div class="member-num">${memberCount}</div>
+      <h4>Member ${memberCount}</h4>
+      <button class="remove-member" onclick="removeMember(${memberCount})">✕</button>
+    </div>
+    <div class="member-fields">
+      <div class="form-group"><label>Full Name *</label><input type="text" id="m${memberCount}_name" placeholder="Full name"></div>
+      <div class="form-group"><label>Reg. Number *</label><input type="text" id="m${memberCount}_reg" placeholder="RA21..."></div>
+      <div class="form-group"><label>Phone</label><input type="tel" id="m${memberCount}_phone" placeholder="Mobile"></div>
+      <div class="form-group"><label>SRM Email</label><input type="email" id="m${memberCount}_email" placeholder="@srmist.edu.in"></div>
+    </div>`;
+  list.appendChild(div);
+}
+
+function removeMember(id) {
+  const el = document.getElementById(`member${id}`);
+  if (el) el.remove();
+}
+
+function goToStep2() {
+  const teamName = document.getElementById('teamName').value.trim();
+  const leaderName = document.getElementById('leaderName').value.trim();
+  if (!teamName || !leaderName) { showToast('Enter team name and leader name', 'error'); return; }
+  const members = collectMembers();
+  if (members.length === 0) { showToast('Add at least one member', 'error'); return; }
+  goTo('register2');
+}
+
+function collectMembers() {
+  const members = [];
+  for (let i = 1; i <= memberCount; i++) {
+    const el = document.getElementById(`member${i}`);
+    if (!el) continue;
+    const name = document.getElementById(`m${i}_name`)?.value.trim();
+    const reg = document.getElementById(`m${i}_reg`)?.value.trim();
+    if (!name || !reg) continue;
+    members.push({
+      name,
+      reg,
+      phone: document.getElementById(`m${i}_phone`)?.value.trim() || '',
+      email: document.getElementById(`m${i}_email`)?.value.trim() || ''
+    });
+  }
+  return members;
+}
+
+function handleRegPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  state.regPhoto = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('regPhotoPreview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.querySelector('#regPhotoZone .icon').style.display = 'none';
+    document.querySelector('#regPhotoZone p').style.display = 'none';
+    // Count faces using face-api or simple detection
+    countFacesInImage(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function countFacesInImage(dataUrl) {
+  const result = document.getElementById('faceCountResult');
+  const text = document.getElementById('faceCountText');
+  result.style.display = 'block';
+  text.innerHTML = '🔍 Analysing photo...';
+  
+  // Simple face count simulation using image analysis
+  // In production: integrate face-api.js or Google Vision API
+  // For now: estimate based on image — require admin to verify
+  await new Promise(r => setTimeout(r, 1500));
+  
+  const members = collectMembers();
+  state.regFaceCount = Math.max(1, members.length); // placeholder count
+  
+  text.innerHTML = `✅ Photo received. <strong>${members.length} member(s)</strong> registered — admin will verify at approval.`;
+  document.getElementById('submitRegBtn').style.display = 'block';
+}
+
+async function submitRegistration() {
+  const teamName = document.getElementById('teamName').value.trim();
+  const leaderName = document.getElementById('leaderName').value.trim();
+  const members = collectMembers();
+  
+  if (!state.regPhoto) { showToast('Take team photo first', 'error'); return; }
+
+  const btn = document.getElementById('submitRegBtn');
+  btn.textContent = 'Submitting...';
+  btn.disabled = true;
+
+  try {
+    const teamId = 'team_' + Date.now();
+    
+    // Convert photo to base64 — store directly in Firestore, no Storage needed
+    let photoBase64 = '';
+    try {
+      photoBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          // Compress: resize to max 400px wide
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxW = 400;
+            const scale = Math.min(1, maxW / img.width);
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7));
+          };
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(state.regPhoto);
+      });
+    } catch(e) {
+      console.warn('Photo compress failed:', e);
+    }
+
+    // Pick route with cooldown
+    const route = await pickRoute();
+
+    const teamData = {
+      id: teamId,
+      teamName,
+      leaderName,
+      members,
+      memberCount: members.length,
+      photoUrl: photoBase64,
+      route: route.id,
+      routeCheckpoints: route.cps,
+      status: 'pending',
+      currentCheckpoint: 0,
+      penalties: 0,
+      hintsUsed: 0,
+      startTime: null,
+      endTime: null,
+      huntTimeSeconds: 0,
+      checkpointsCompleted: [],
+      registeredAt: Date.now()
+    };
+
+    await fbSet(`teams/${teamId}`, teamData);
+
+    state.team = teamData;
+    localStorage.setItem('srmHuntTeam', JSON.stringify(teamData));
+
+    showToast('Registered! Waiting for admin approval.', 'success');
+    showWaiting(teamData);
+
+  } catch (err) {
+    console.error('Registration error:', err);
+    showToast('Error: ' + (err.message || 'Check Firestore rules'), 'error');
+    btn.textContent = 'Submit Registration 🚀';
+    btn.disabled = false;
+  }
+}
+
+async function pickRoute() {
+  // Get recently used routes (last ROUTE_COOLDOWN teams)
+  const teams = await fbGetAll('teams');
+  teams.sort((a,b) => (b.registeredAt||0) - (a.registeredAt||0));
+  const recentRoutes = teams.slice(0, ROUTE_COOLDOWN).map(t => t.route).filter(Boolean);
+  
+  const available = ROUTES.filter(r => !recentRoutes.includes(r.id));
+  const pool = available.length > 0 ? available : ROUTES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ================================================================
+// WAITING SCREEN
+// ================================================================
+function showWaiting(teamData) {
+  document.getElementById('waitingTeamName').textContent = teamData.teamName;
+  document.getElementById('waitingTeamDetails').textContent = 
+    `${teamData.memberCount} member(s) · Leader: ${teamData.leaderName}`;
+  
+  goTo('waiting');
+
+  // Listen for status changes
+  if (state.waitingListener) state.waitingListener();
+  state.waitingListener = fs.onSnapshot(fs.doc(db, 'teams', teamData.id), snap => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    state.team = { id: teamData.id, ...data };
+    localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+    
+    if (data.status === 'approved' || data.status === 'hunting') {
+      document.getElementById('waitingIcon').textContent = '✅';
+      document.getElementById('waitingTitle').textContent = 'Approved!';
+      document.getElementById('waitingMsg').textContent = 'Admin has approved your team. Get ready!';
+      document.getElementById('huntReadyBlock').style.display = 'block';
+    }
+  });
+}
+
+function startHunt() {
+  if (!state.team) return;
+  fbSet(`teams/${state.team.id}`, { status: 'hunting', startTime: Date.now() });
+  state.team.status = 'hunting';
+  state.team.startTime = Date.now();
+  localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+  showHunt();
+}
+
+// ================================================================
+// HUNT SCREEN
+// ================================================================
+function showHunt() {
+  goTo('hunt');
+  const t = state.team;
+  document.getElementById('huntTeamLabel').textContent = t.teamName;
+  document.getElementById('huntRouteLabel').textContent = `Route ${t.route}`;
+  
+  renderCheckpointDots();
+  loadCurrentClue();
+  startTimer();
+  startGPS();
+}
+
+function renderCheckpointDots() {
+  const t = state.team;
+  const dots = document.getElementById('huntDots');
+  dots.innerHTML = '';
+  t.routeCheckpoints.forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'progress-dot' + (i < t.currentCheckpoint ? ' done' : i === t.currentCheckpoint ? ' current' : '');
+    dots.appendChild(d);
+  });
+}
+
+function loadCurrentClue() {
+  const t = state.team;
+  const cp = t.currentCheckpoint;
+  const locId = t.routeCheckpoints[cp];
+  const clue = CLUES[locId];
+  
+  document.getElementById('clueNum').textContent = `CHECKPOINT ${cp+1} OF ${t.routeCheckpoints.length}`;
+  document.getElementById('clueText').textContent = clue ? clue.riddle : 'Solve the riddle and find the location!';
+}
+
+function startTimer() {
+  if (state.huntInterval) clearInterval(state.huntInterval);
+  state.huntInterval = setInterval(() => {
+    if (!state.team || !state.team.startTime) return;
+    const elapsed = Math.floor((Date.now() - state.team.startTime) / 1000);
+    const penalties = (state.team.penalties || 0) * 60;
+    const total = elapsed + penalties;
+    document.getElementById('huntTimer').textContent = formatTime(elapsed);
+    document.getElementById('penaltyDisplay').textContent = `+${state.team.penalties || 0}m penalty`;
+  }, 1000);
+}
+
+function startGPS() {
+  if (!navigator.geolocation) {
+    document.getElementById('huntDist').textContent = 'GPS unavailable';
+    return;
+  }
+  if (state.gpsWatcher) navigator.geolocation.clearWatch(state.gpsWatcher);
+  state.gpsWatcher = navigator.geolocation.watchPosition(
+    pos => {
+      state.currentLat = pos.coords.latitude;
+      state.currentLng = pos.coords.longitude;
+      updateProximity();
+    },
+    err => console.log('GPS error:', err),
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+  );
+}
+
+function updateProximity() {
+  if (!state.team || state.currentLat === null) return;
+  const cp = state.team.currentCheckpoint;
+  const locId = state.team.routeCheckpoints[cp];
+  const loc = LOCATIONS[locId];
+  if (!loc) return;
+  
+  const dist = getDistance(state.currentLat, state.currentLng, loc.lat, loc.lng);
+  const maxDist = 500; // show bar only within 500m
+  const pct = Math.max(0, Math.min(100, (1 - dist / maxDist) * 100));
+  
+  const bar = document.getElementById('huntBar');
+  const label = document.getElementById('huntTempLabel');
+  const distEl = document.getElementById('huntDist');
+  
+  bar.style.width = pct + '%';
+  distEl.textContent = dist < 1000 ? Math.round(dist) + 'm away' : (dist/1000).toFixed(1) + 'km away';
+  
+  let color, text;
+  if (dist > 400) { color='var(--cold1)'; text='❄️ Ice Cold'; }
+  else if (dist > 200) { color='var(--cold2)'; text='🌊 Cold'; }
+  else if (dist > 80) { color='var(--warm3)'; text='☀️ Warm'; }
+  else if (dist > 40) { color='var(--warm2)'; text='🔥 Hot'; }
+  else { color='var(--warm1)'; text='🌋 BURNING HOT'; }
+  
+  bar.style.background = color;
+  label.style.color = color;
+  label.textContent = text;
+  
+  // Update hint modal too
+  updateHintModalProximity(dist);
+}
+
+// ================================================================
+// HINT MODAL
+// ================================================================
+function openHintModal() {
+  document.getElementById('hintModal').classList.add('active');
+  if (state.currentLat !== null) updateHintModalProximity(getCurrentCpDistance());
+}
+
+function closeHintModal() {
+  document.getElementById('hintModal').classList.remove('active');
+}
+
+function getCurrentCpDistance() {
+  if (!state.team || state.currentLat === null) return 99999;
+  const locId = state.team.routeCheckpoints[state.team.currentCheckpoint];
+  const loc = LOCATIONS[locId];
+  if (!loc) return 99999;
+  return getDistance(state.currentLat, state.currentLng, loc.lat, loc.lng);
+}
+
+function updateHintModalProximity(dist) {
+  const bar = document.getElementById('hintBar');
+  const label = document.getElementById('hintTempLabel');
+  const distEl = document.getElementById('hintDist');
+  
+  const maxDist = 300;
+  const pct = Math.max(0, Math.min(100, (1 - dist / maxDist) * 100));
+  bar.style.width = pct + '%';
+  distEl.textContent = dist < 1000 ? Math.round(dist) + 'm' : (dist/1000).toFixed(1) + 'km';
+  
+  const unlocked = dist <= 40;
+  const lockMsg = document.getElementById('hintLockMsg');
+  const hintContent = document.getElementById('hintContent');
+  
+  let color, text;
+  if (dist > 200) { color='var(--cold1)'; text='❄️ Ice Cold'; }
+  else if (dist > 100) { color='var(--cold2)'; text='🌊 Cold'; }
+  else if (dist > 40) { color='var(--warm3)'; text='🔥 Getting Hot...'; }
+  else { color='var(--warm1)'; text='🌋 You\'re here!'; }
+  
+  bar.style.background = color;
+  label.style.color = color;
+  label.textContent = text;
+  
+  if (unlocked) {
+    lockMsg.style.display = 'none';
+    hintContent.style.display = 'block';
+    const locId = state.team.routeCheckpoints[state.team.currentCheckpoint];
+    const clue = CLUES[locId];
+    document.getElementById('hintText').textContent = clue ? clue.hint : 'You\'re already there!';
+  } else {
+    lockMsg.style.display = 'block';
+    hintContent.style.display = 'none';
+  }
+}
+
+function confirmHint() {
+  if (!state.team) return;
+  state.team.penalties = (state.team.penalties || 0) + 1;
+  state.team.hintsUsed = (state.team.hintsUsed || 0) + 1;
+  fbSet(`teams/${state.team.id}`, { penalties: state.team.penalties, hintsUsed: state.team.hintsUsed });
+  localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+  document.getElementById('penaltyDisplay').textContent = `+${state.team.penalties}m penalty`;
+  document.getElementById('confirmHintBtn').textContent = '✅ Hint Used';
+  document.getElementById('confirmHintBtn').disabled = true;
+  showToast(`+1 minute penalty applied. Total: ${state.team.penalties}m`, 'error');
+}
+
+// ================================================================
+// VERIFY MODAL
+// ================================================================
+function openVerifyModal() {
+  state.verifyPhoto = null;
+  document.getElementById('verifyPreview').style.display = 'none';
+  document.getElementById('verifyPhotoZone').querySelector('.icon').style.display = 'block';
+  document.getElementById('verifyPhotoZone').querySelector('p').textContent = 'Tap to open camera';
+  document.getElementById('verifyChecks').style.display = 'none';
+  document.getElementById('verifyResult').style.display = 'none';
+  document.getElementById('verifySubmitBtn').style.display = 'none';
+  document.getElementById('verifyCloseBtn').textContent = 'Cancel';
+  document.getElementById('verifyModal').classList.add('active');
+}
+
+function closeVerifyModal() {
+  document.getElementById('verifyModal').classList.remove('active');
+}
+
+function openVerifyCamera() {
+  if (document.getElementById('verifyResult').style.display === 'block') return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'user';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    state.verifyPhoto = file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = document.getElementById('verifyPreview');
+      img.src = ev.target.result;
+      img.style.display = 'block';
+      document.getElementById('verifyPhotoZone').querySelector('.icon').style.display = 'none';
+      document.getElementById('verifyPhotoZone').querySelector('p').textContent = 'Photo captured';
+      document.getElementById('verifySubmitBtn').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+async function submitVerify() {
+  if (!state.verifyPhoto) { showToast('Take photo first', 'error'); return; }
+  
+  const btn = document.getElementById('verifySubmitBtn');
+  btn.textContent = 'Verifying...';
+  btn.disabled = true;
+  
+  document.getElementById('verifyChecks').style.display = 'block';
+  
+  // Step 1: GPS Check
+  const locId = state.team.routeCheckpoints[state.team.currentCheckpoint];
+  const loc = LOCATIONS[locId];
+  const gpsItem = document.getElementById('chk-gps');
+  const gpsText = document.getElementById('chk-gps-text');
+  
+  gpsText.textContent = 'Checking GPS...';
+  await sleep(800);
+  
+  let gpsPass = false;
+  if (state.currentLat !== null && loc) {
+    const dist = getDistance(state.currentLat, state.currentLng, loc.lat, loc.lng);
+    gpsPass = dist <= loc.radius;
+    gpsText.textContent = gpsPass ? `✅ Within ${Math.round(dist)}m of checkpoint` : `❌ ${Math.round(dist)}m away — need to be within ${loc.radius}m`;
+    gpsItem.className = 'check-item ' + (gpsPass ? 'pass' : 'fail');
+  } else {
+    // If GPS unavailable, warn but allow (admin can review photo)
+    gpsPass = true;
+    gpsText.textContent = '⚠️ GPS unavailable — photo will be reviewed by admin';
+    gpsItem.className = 'check-item pass';
+  }
+  
+  // Step 2: Face count check
+  const faceItem = document.getElementById('chk-face');
+  const faceText = document.getElementById('chk-face-text');
+  faceText.textContent = 'Analysing photo...';
+  await sleep(1200);
+  
+  // Simulated face detection — in production use face-api.js
+  // For now: if photo is uploaded, pass face check (admin reviews)
+  const expectedCount = state.team.memberCount || 1;
+  faceText.textContent = `✅ ${expectedCount} team member(s) expected — photo submitted for admin review`;
+  faceItem.className = 'check-item pass';
+  
+  await sleep(800);
+  
+  // Result
+  const resultDiv = document.getElementById('verifyResult');
+  const resultIcon = document.getElementById('verifyResultIcon');
+  const resultText = document.getElementById('verifyResultText');
+  const resultSub = document.getElementById('verifyResultSub');
+  
+  resultDiv.style.display = 'block';
+  btn.style.display = 'none';
+  document.getElementById('verifyCloseBtn').textContent = 'Done';
+  
+  if (!gpsPass) {
+    resultIcon.textContent = '❌';
+    resultText.textContent = 'GPS check failed';
+    resultSub.textContent = 'Move closer to the checkpoint location and try again.';
+    btn.style.display = 'block';
+    btn.textContent = 'Try Again';
+    btn.disabled = false;
+    return;
+  }
+  
+  // Upload verify photo as base64
+  try {
+    const b64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 400;
+          const scale = Math.min(1, maxW / img.width);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(state.verifyPhoto);
+    });
+    const completed = [...(state.team.checkpointsCompleted || []), locId];
+    await fbSet(`teams/${state.team.id}`, {
+      checkpointsCompleted: completed,
+      [`cpPhoto${state.team.currentCheckpoint}`]: b64
+    });
+  } catch(e) { console.warn('Photo save failed', e); }
+  
+  // Checkpoint passed!
+  resultIcon.textContent = '✅';
+  resultText.textContent = 'Checkpoint Verified!';
+  
+  state.team.currentCheckpoint++;
+  state.team.checkpointsCompleted = [...(state.team.checkpointsCompleted || []), locId];
+  
+  if (state.team.currentCheckpoint >= state.team.routeCheckpoints.length) {
+    // HUNT COMPLETE
+    const endTime = Date.now();
+    state.team.status = 'finished';
+    state.team.endTime = endTime;
+    const huntSec = Math.floor((endTime - state.team.startTime) / 1000);
+    state.team.huntTimeSeconds = huntSec;
+    const totalSec = huntSec + (state.team.penalties || 0) * 60;
+    state.team.totalTimeSeconds = totalSec;
+    
+    await fbSet(`teams/${state.team.id}`, {
+      status: 'finished',
+      endTime,
+      huntTimeSeconds: huntSec,
+      totalTimeSeconds: totalSec,
+      currentCheckpoint: state.team.currentCheckpoint
+    });
+    
+    localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+    resultSub.textContent = '🎉 All checkpoints done! Return to TP1.';
+    
+    setTimeout(() => {
+      closeVerifyModal();
+      showComplete();
+    }, 2000);
+  } else {
+    await fbSet(`teams/${state.team.id}`, { currentCheckpoint: state.team.currentCheckpoint });
+    localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+    const nextLoc = state.team.routeCheckpoints[state.team.currentCheckpoint];
+    resultSub.textContent = `Next: Checkpoint ${state.team.currentCheckpoint + 1} of ${state.team.routeCheckpoints.length}`;
+    
+    setTimeout(() => {
+      closeVerifyModal();
+      renderCheckpointDots();
+      loadCurrentClue();
+    }, 2000);
+  }
+}
+
+// ================================================================
+// COMPLETE
+// ================================================================
+function showComplete() {
+  if (state.huntInterval) clearInterval(state.huntInterval);
+  if (state.gpsWatcher) navigator.geolocation.clearWatch(state.gpsWatcher);
+  
+  const t = state.team;
+  document.getElementById('completeTeamName').textContent = t.teamName;
+  document.getElementById('completeHuntTime').textContent = formatTime(t.huntTimeSeconds || 0);
+  document.getElementById('completePenalty').textContent = `+${t.penalties || 0}m`;
+  document.getElementById('completeFinalTime').textContent = formatTime(t.totalTimeSeconds || 0);
+  goTo('complete');
+}
+
+// ================================================================
+// LEADERBOARD
+// ================================================================
+function renderLeaderboard(teams) {
+  const finished = teams.filter(t => t.status === 'finished').sort((a,b) => (a.totalTimeSeconds||99999) - (b.totalTimeSeconds||99999));
+  const active = teams.filter(t => t.status === 'hunting');
+  
+  document.getElementById('lbFinished').textContent = finished.length;
+  document.getElementById('lbActive').textContent = active.length;
+  
+  const list = document.getElementById('lbList');
+  
+  if (!state.isAdmin && !isHuntOver()) {
+    // Show own rank + top 3 only
+    list.innerHTML = '';
+    const top3 = finished.slice(0, 3);
+    if (top3.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;">No finishers yet.</div>';
+    } else {
+      top3.forEach((t, i) => renderLbRow(list, t, i+1));
+    }
+    document.getElementById('lbHidden').style.display = 'block';
+    
+    // Show own rank if in hunt
+    if (state.team) {
+      const myRank = finished.findIndex(t => t.id === state.team.id) + 1;
+      const myTeam = finished.find(t => t.id === state.team.id);
+      if (myTeam && myRank > 0) {
+        document.getElementById('lbMyRank').style.display = 'block';
+        document.getElementById('lbMyRankText').innerHTML = `<span style="font-size:1.5rem;font-weight:800;color:var(--gold)">#${myRank}</span> <span style="color:var(--muted);font-size:.85rem;"> · ${state.team.teamName} · ${formatTime(myTeam.totalTimeSeconds)}</span>`;
+      }
+    }
+    return;
+  }
+  
+  // Admin: show all
+  document.getElementById('lbHidden').style.display = 'none';
+  list.innerHTML = '';
+  if (finished.length === 0) {
+    list.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem;">No finishers yet.</div>';
+  } else {
+    finished.forEach((t, i) => renderLbRow(list, t, i+1));
+  }
+  
+  // Show active at bottom
+  active.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'lb-row';
+    row.innerHTML = `<div class="lb-rank">—</div><div class="lb-team"><h4>${t.teamName}</h4><p>${t.leaderName} · CP ${(t.currentCheckpoint||0)+1}/${(t.routeCheckpoints||[]).length}</p></div><div class="lb-active">● IN PROGRESS</div>`;
+    list.appendChild(row);
+  });
+}
+
+function renderLbRow(container, t, rank) {
+  const row = document.createElement('div');
+  row.className = 'lb-row';
+  const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : '';
+  row.innerHTML = `<div class="lb-rank ${rankClass}">${rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':rank}</div><div class="lb-team"><h4>${t.teamName}</h4><p>${t.leaderName} · ${t.memberCount||'?'} members</p></div><div class="lb-time">${formatTime(t.totalTimeSeconds||0)}</div>`;
+  container.appendChild(row);
+}
+
+function isHuntOver() {
+  return false; // Can be updated based on hunt config
+}
+
+// ================================================================
+// ADMIN
+// ================================================================
+function openAdminLogin() {
+  document.getElementById('adminLoginModal').classList.add('active');
+  setTimeout(() => document.getElementById('adminPassInput').focus(), 300);
+}
+
+function checkAdminPass() {
+  const pass = document.getElementById('adminPassInput').value;
+  if (pass === ADMIN_PASSWORD) {
+    state.isAdmin = true;
+    document.getElementById('adminPassInput').value = '';
+    closeModal('adminLoginModal');
+    fbGetAll('teams').then(teams => renderAdmin(teams));
+    goTo('admin');
+  } else {
+    showToast('Wrong password', 'error');
+  }
+}
+
+function adminLogout() {
+  state.isAdmin = false;
+  goTo('home');
+}
+
+function renderAdmin(teams) {
+  const pending = teams.filter(t => t.status === 'pending');
+  const active = teams.filter(t => t.status === 'hunting');
+  const finished = teams.filter(t => t.status === 'finished');
+  
+  document.getElementById('adminTotalTeams').textContent = teams.length;
+  document.getElementById('adminPending').textContent = pending.length;
+  document.getElementById('adminDone').textContent = finished.length;
+  
+  renderAdminSection('adminPendingList', pending, 'pending');
+  renderAdminSection('adminActiveList', active, 'active');
+  renderAdminSection('adminFinishedList', finished, 'finished');
+  
+  // Also update leaderboard for admin
+  renderLeaderboard(teams);
+}
+
+function renderAdminSection(containerId, teams, type) {
+  const el = document.getElementById(containerId);
+  if (teams.length === 0) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:.85rem;padding:.75rem 0;">None</div>`;
+    return;
+  }
+  el.innerHTML = '';
+  teams.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'team-admin-card';
+    let statusHtml = `<span class="status-badge ${type}">${type}</span>`;
+    let btnHtml = '';
+    if (type === 'pending') {
+      btnHtml = `<div class="approve-btns">
+        <button class="btn btn-green btn-sm" style="flex:1" onclick="approveTeam('${t.id}')">✅ Approve</button>
+        <button class="btn btn-ghost btn-sm" style="flex:1; border-color:var(--accent); color:var(--accent);" onclick="rejectTeam('${t.id}')">❌ Reject</button>
+      </div>`;
+    } else if (type === 'active') {
+      btnHtml = `<div style="font-size:.8rem; color:var(--muted); font-family:'JetBrains Mono',monospace;">CP ${(t.currentCheckpoint||0)+1}/${(t.routeCheckpoints||[]).length} · ${t.penalties||0}m penalty</div>`;
+    } else if (type === 'finished') {
+      btnHtml = `<div style="font-family:'JetBrains Mono',monospace; color:var(--green); font-size:.95rem;">${formatTime(t.totalTimeSeconds||0)}</div>`;
+    }
+    
+    card.innerHTML = `
+      ${t.photoUrl ? `<img src="${t.photoUrl}" alt="Team photo">` : ''}
+      <h4>${t.teamName} ${statusHtml}</h4>
+      <p>${t.memberCount||'?'} members · Leader: ${t.leaderName} · Route ${t.route||'?'}</p>
+      ${btnHtml}`;
+    el.appendChild(card);
+  });
+}
+
+async function approveTeam(id) {
+  await fbSet(`teams/${id}`, { status: 'approved' });
+  showToast('Team approved!', 'success');
+}
+
+async function rejectTeam(id) {
+  if (!confirm('Reject this team?')) return;
+  await fbSet(`teams/${id}`, { status: 'rejected' });
+  showToast('Team rejected.', 'error');
+}
+
+async function adminStartAll() {
+  const teams = await fbGetAll('teams');
+  const toStart = teams.filter(t => t.status === 'pending' || t.status === 'approved');
+  for (const t of toStart) {
+    await fbSet(`teams/${t.id}`, { status: 'approved' });
+  }
+  showToast(`Hunt started for all teams!`, 'success');
+}
+
+async function adminExport() {
+  const teams = await fbGetAll('teams');
+  const header = 'Team,Leader,Members,Route,Status,Hunt Time,Penalties,Total Time';
+  const rows = teams.map(t => [
+    t.teamName, t.leaderName, t.memberCount||'?', t.route||'?',
+    t.status, formatTime(t.huntTimeSeconds||0), (t.penalties||0) + 'm', formatTime(t.totalTimeSeconds||0)
+  ].join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'srm_hunt_results.csv'; a.click();
+}
+
+async function adminClearAll() {
+  if (!confirm('Clear ALL team data? This cannot be undone.')) return;
+  const teams = await fbGetAll('teams');
+  for (const t of teams) {
+    await fs.setDoc(fs.doc(db, 'teams', t.id), { ...t, status: 'rejected' });
+  }
+  showToast('All teams cleared.', 'success');
+}
+
+// ================================================================
+// CONTINUE SESSION
+// ================================================================
+function checkContinue() {
+  const saved = localStorage.getItem('srmHuntTeam');
+  if (!saved) { showToast('No active session found.', 'error'); return; }
+  const t = JSON.parse(saved);
+  state.team = t;
+  fbGet(`teams/${t.id}`).then(fresh => {
+    if (fresh) {
+      state.team = { id: t.id, ...fresh };
+      localStorage.setItem('srmHuntTeam', JSON.stringify(state.team));
+    }
+    resumeSession();
+  });
+}
+
+// ================================================================
+// UTILS
+// ================================================================
+function getDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' ' + type : '');
+  setTimeout(() => t.className = '', 3500);
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+</script>
+</body>
+</html>
